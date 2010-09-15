@@ -34,6 +34,8 @@
 #include <linux/syscalls.h>
 #include <linux/gfp.h>
 
+#include <asm/tlbflush.h>
+
 #include "internal.h"
 
 #include <asm/tlbflush.h>
