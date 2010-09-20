@@ -389,6 +389,7 @@ static int __init pm_init(void)
 	int error = pm_start_workqueue();
 	if (error)
 		return error;
+	hibernate_image_size_init();
 	power_kobj = kobject_create_and_add("power", NULL);
 #ifdef CONFIG_PERFLOCK
 	perf_lock_init(&user_perf_lock, PERF_LOCK_HIGHEST, "User Perflock");
