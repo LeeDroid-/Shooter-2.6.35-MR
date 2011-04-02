@@ -261,9 +261,17 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 		goto out;
 
 	rsp = scm_command_to_response(cmd);
+	end = (u32)scm_get_response_buffer(rsp) + resp_len;
+	end = round_up(end, cacheline_size);
+
 	do {
-		dmac_inv_range((void *)rsp,
-				scm_get_response_buffer(rsp) + resp_len);
+		u32 start = round_down((u32)rsp, cacheline_size);
+
+		while (start < end) {
+			asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
+			     : "memory");
+			start += cacheline_size;
+		}
 	} while (!rsp->is_complete);
 
 	if (resp_buf)
