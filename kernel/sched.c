@@ -1208,6 +1208,16 @@ static void resched_cpu(int cpu)
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
 
+void force_cpu_resched(int cpu)
+{
+       struct rq *rq = cpu_rq(cpu);
+       unsigned long flags;
+
+       raw_spin_lock_irqsave(&rq->lock, flags);
+       resched_task(cpu_curr(cpu));
+       raw_spin_unlock_irqrestore(&rq->lock, flags);
+}
+
 #ifdef CONFIG_NO_HZ
 /*
  * When add_timer_on() enqueues a timer into the timer wheel of an
@@ -1291,6 +1301,11 @@ static void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
 
 static void sched_avg_update(struct rq *rq)
 {
+}
+
+void force_cpu_resched(int cpu)
+{
+       set_need_resched();
 }
 #endif /* CONFIG_SMP */
 
@@ -2735,6 +2750,24 @@ void sched_fork(struct task_struct *p, int clone_flags)
 	put_cpu();
 }
 
+#ifdef CONFIG_PREEMPT_COUNT_CPU
+
+/*
+ * Fetch the preempt count of some cpu's current task.  Must be called
+ * with interrupts blocked.  Stale return value.
+ *
+ * No locking needed as this always wins the race with context-switch-out
+ * + task destruction, since that is so heavyweight.  The smp_rmb() is
+ * to protect the pointers in that race, not the data being pointed to
+ * (which, being guaranteed stale, can stand a bit of fuzziness).
+ */
+int preempt_count_cpu(int cpu)
+{
+       smp_rmb(); /* stop data prefetch until program ctr gets here */
+       return task_thread_info(cpu_curr(cpu))->preempt_count;
+}
+#endif
+
 /*
  * wake_up_new_task - wake up a newly created task for the first time.
  *
@@ -3816,7 +3849,7 @@ void __kprobes add_preempt_count(int val)
 	if (DEBUG_LOCKS_WARN_ON((preempt_count() < 0)))
 		return;
 #endif
-	preempt_count() += val;
+	__add_preempt_count(val);
 #ifdef CONFIG_DEBUG_PREEMPT
 	/*
 	 * Spinlock count overflowing soon?
@@ -3847,7 +3880,7 @@ void __kprobes sub_preempt_count(int val)
 
 	if (preempt_count() == val)
 		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
-	preempt_count() -= val;
+	__sub_preempt_count(val);
 }
 EXPORT_SYMBOL(sub_preempt_count);
 
@@ -3985,6 +4018,9 @@ need_resched_nonpreemptible:
 
 		rq->nr_switches++;
 		rq->curr = next;
+#ifdef CONFIG_PREEMPT_COUNT_CPU
+               smp_wmb();
+#endif
 		++*switch_count;
 
 		context_switch(rq, prev, next); /* unlocks the rq */
@@ -8281,6 +8317,9 @@ struct task_struct *curr_task(int cpu)
  * set_curr_task - set the current task for a given cpu.
  * @cpu: the processor in question.
  * @p: the task pointer to set.
+#ifdef CONFIG_PREEMPT_COUNT_CPU
+       smp_wmb();
+#endif
  *
  * Description: This function must only be used when non-maskable interrupts
  * are serviced on a separate stack. It allows the architecture to switch the
