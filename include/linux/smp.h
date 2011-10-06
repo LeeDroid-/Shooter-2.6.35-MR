@@ -130,9 +130,10 @@ static inline int up_smp_call_function(void (*func)(void *), void *info)
 			(up_smp_call_function(func, info))
 #define on_each_cpu(func,info,wait)		\
 	({					\
-		local_irq_disable();		\
+		unsigned long __flags;		\
+		local_irq_save(__flags);	\
 		func(info);			\
-		local_irq_enable();		\
+		local_irq_restore(__flags);	\
 		0;				\
 	})
 static inline void smp_send_reschedule(int cpu) { }
