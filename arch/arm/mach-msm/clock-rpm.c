@@ -18,10 +18,16 @@
 
 #include <linux/err.h>
 #include <mach/clk.h>
+#include <mach/msm_iomap.h>
+#include <mach/scm-io.h>
 
 #include "rpm_resources.h"
 #include "clock.h"
 #include "clock-rpm.h"
+#include "clock-local.h"
+
+#define MMSS_MAXI_EN2		(MSM_MMSS_CLK_CTL_BASE + 0x0020)
+#define SMI_2X_AXI_CLK_EN	BIT(30)
 
 static DEFINE_SPINLOCK(rpm_clock_lock);
 
@@ -80,6 +86,16 @@ static int rpm_clk_enable(unsigned id)
 		unsigned peer_id = rpm_clk[id].peer_clk_id;
 		unsigned peer_khz = 0, peer_sleep_khz = 0;
 
+		/* Turn on local smi_clk before enabling remote clock. */
+		if (id == R_SMI_CLK || id == R_SMI_A_CLK) {
+			uint32_t regval;
+			spin_lock(&local_clock_reg_lock);
+			regval = secure_readl(MMSS_MAXI_EN2);
+			regval |= SMI_2X_AXI_CLK_EN;
+			secure_writel(regval, MMSS_MAXI_EN2);
+			spin_unlock(&local_clock_reg_lock);
+		}
+
 		iv.id = rpm_clk[id].rpm_clk_id;
 
 		/* Take peer clock's rate into account only if it's enabled. */
@@ -119,27 +135,42 @@ static void rpm_clk_disable(unsigned id)
 		goto out;
 	}
 
-	if (!rpm_clk[id].count && rpm_clk[id].last_set_khz) {
-		struct msm_rpm_iv_pair iv;
+	if (!rpm_clk[id].count) {
 		unsigned peer_id = rpm_clk[id].peer_clk_id;
-		unsigned peer_khz = 0, peer_sleep_khz = 0;
-		int rc;
 
-		iv.id = rpm_clk[id].rpm_clk_id;
+		if (rpm_clk[id].last_set_khz) {
+			struct msm_rpm_iv_pair iv;
+			unsigned peer_khz = 0, peer_sleep_khz = 0;
+			int rc;
 
-		/* Take peer clock's rate into account only if it's enabled. */
-		if (rpm_clk[peer_id].count) {
-			peer_khz = rpm_clk[peer_id].last_set_khz;
-			peer_sleep_khz = rpm_clk[peer_id].last_set_sleep_khz;
+			iv.id = rpm_clk[id].rpm_clk_id;
+
+			/* Take peer clock rate into account only if enabled. */
+			if (rpm_clk[peer_id].count) {
+				peer_khz = rpm_clk[peer_id].last_set_khz;
+				peer_sleep_khz =
+					rpm_clk[peer_id].last_set_sleep_khz;
+			}
+
+			iv.value = peer_khz;
+			rc = msm_rpmrs_set_noirq(MSM_RPM_CTX_SET_0, &iv, 1);
+			if (rc)
+				goto out;
+
+			iv.value = peer_sleep_khz;
+			rc = msm_rpmrs_set_noirq(MSM_RPM_CTX_SET_SLEEP, &iv, 1);
 		}
 
-		iv.value = peer_khz;
-		rc = msm_rpmrs_set_noirq(MSM_RPM_CTX_SET_0, &iv, 1);
-		if (rc)
-			goto out;
-
-		iv.value = peer_sleep_khz;
-		rc = msm_rpmrs_set_noirq(MSM_RPM_CTX_SET_SLEEP, &iv, 1);
+		/* Turn off local smi_clk after disabling remote clock. */
+		if ((id == R_SMI_CLK || id == R_SMI_A_CLK)
+		    && !rpm_clk[peer_id].count) {
+			uint32_t regval;
+			spin_lock(&local_clock_reg_lock);
+			regval = secure_readl(MMSS_MAXI_EN2);
+			regval &= ~SMI_2X_AXI_CLK_EN;
+			secure_writel(regval, MMSS_MAXI_EN2);
+			spin_unlock(&local_clock_reg_lock);
+		}
 	}
 
 out:
