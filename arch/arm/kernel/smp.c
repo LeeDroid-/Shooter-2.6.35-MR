@@ -552,6 +552,8 @@ asmlinkage void __exception do_IPI(struct pt_regs *regs)
 void smp_send_reschedule(int cpu)
 {
 	if (unlikely(cpu_is_offline(cpu))) {
+		pr_warn("%s: attempt to send resched-IPI to an offline cpu.\n",
+				__func__);
 		return;
 	}
 
