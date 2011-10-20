@@ -421,7 +421,8 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 				    "req->length = %d\n", w_length, req->length);
 			w_length = 32;
 		}
-		if (w_value || w_index != rndis->ctrl_id
+		if (w_length > req->length || w_value
+				|| w_index != rndis->ctrl_id)
 			goto invalid;
 		/* read the request; process it later */
 		value = w_length;
