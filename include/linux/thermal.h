@@ -138,6 +138,7 @@ struct thermal_zone_device {
 	struct thermal_hwmon_attr temp_input;	/* hwmon sys attr */
 	struct thermal_hwmon_attr temp_crit;	/* hwmon sys attr */
 #endif
+	int thermal_trip_critical_retry_count;
 };
 
 struct thermal_zone_device *thermal_zone_device_register(char *, int, void *,

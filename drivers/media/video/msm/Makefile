@@ -29,21 +29,22 @@ obj-$(CONFIG_MACH_EXPRESS) += s5k6aafx.o s5k6aafx_reg_flyer.o
 obj-$(CONFIG_MACH_EXPRESS_KT) += s5k6aafx.o s5k6aafx_reg_flyer.o
 obj-$(CONFIG_MACH_SUPERSONIC) += s5k6aafx_suc.o s5k6aafx_reg_suc.o
 obj-$(CONFIG_MACH_SHOOTER) += s5k6aafx.o s5k6aafx_reg_shooter.o s5k6aafx_reg_shooter_cob.o
-obj-$(CONFIG_MACH_SHOOTER_K) += s5k6aafx.o s5k6aafx_reg_shooter.o s5k6aafx_reg_shooter_cob.o
 obj-$(CONFIG_MACH_SHOOTER_U) += s5k6aafx.o s5k6aafx_reg_shooter.o s5k6aafx_reg_shooter_cob.o
 obj-$(CONFIG_MACH_VERDI) += s5k6aafx.o s5k6aafx_reg_verdi.o
-obj-$(CONFIG_MACH_VERDI_LTE) += s5k6aafx.o s5k6aafx_reg_verdi.o
-obj-$(CONFIG_MACH_RIDER) += s5k6aafx.o s5k6aafx_reg_rider.o
-obj-$(CONFIG_MACH_KINGDOM) += s5k6aafx.o s5k6aafx_reg_kingdom.o
-obj-$(CONFIG_MACH_HOLIDAY) += s5k6aafx.o s5k6aafx_reg_holiday.o
+obj-$(CONFIG_MACH_VERDI_LTE) += s5k6aafx.o s5k6aafx_reg_verdi.o s5k6aafx_reg_verdi_cob.o
+obj-$(CONFIG_MACH_RIDER) += s5k6aafx.o s5k6aafx_reg_rider.o s5k6aafx_reg_rider_cob.o
+obj-$(CONFIG_MACH_KINGDOM) += s5k6aafx.o s5k6aafx_reg_kingdom.o s5k6aafx_reg_kingdom_cob.o
+obj-$(CONFIG_MACH_HOLIDAY) += s5k6aafx.o s5k6aafx_reg_holiday.o s5k6aafx_reg_holiday_cob.o
 endif
 obj-$(CONFIG_ARCH_MSM_ARM11) += msm_vfe7x.o msm_io7x.o
 obj-$(CONFIG_ARCH_QSD8X50) += msm_vfe8x.o msm_vfe8x_proc.o msm_io8x.o
 obj-$(CONFIG_VB6801) += vb6801.o
 obj-$(CONFIG_OV8810) += ov8810.o
+obj-$(CONFIG_OV8830) += ov8830.o ov8830_reg.o
 obj-$(CONFIG_IMX105) += imx105.o imx105_reg.o
 obj-$(CONFIG_SP3D) += sp3d.o sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o
-obj-$(CONFIG_QS_S5K4E1) += qs_s5k4e1.o qs_s5k4e1_reg.o sp3d.o sp3d_reg_3d.o sp3d_reg_2d.o sp3d_reg_com.o sp3d_reg_cal.o
+obj-$(CONFIG_QS_S5K4E1) += qs_s5k4e1.o qs_s5k4e1_reg.o
+obj-$(CONFIG_MT9D015) += mt9d015.o mt9d015_reg.o
 ifdef CONFIG_MACH_SUPERSONIC
 obj-$(CONFIG_S5K3H1GX) += s5k3h1gx_suc.o s5k3h1gx_reg_suc.o
 else
@@ -56,7 +57,11 @@ endif
 ifdef CONFIG_MACH_DOUBLESHOT
 obj-$(CONFIG_S5K3H2YX) += s5k3h2yx.o s5k3h2yx_reg_dot.o
 else
+ifdef CONFIG_MACH_VERDI_LTE
+obj-$(CONFIG_S5K3H2YX) += s5k3h2yx_pui.o  s5k3h2yx_reg.o
+else
 obj-$(CONFIG_S5K3H2YX) += s5k3h2yx.o s5k3h2yx_reg.o
+endif
 endif
 obj-$(CONFIG_MT9V113) += mt9v113.o mt9v113_reg.o
 obj-$(CONFIG_MSM_GEMINI) += msm_gemini_dev.o msm_gemini_sync.o msm_gemini_core.o msm_gemini_hw.o msm_gemini_platform.o

@@ -566,6 +566,24 @@ projector_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	spin_unlock_irq(&dev->lock);
 }
 
+static void
+projector_function_release(struct usb_configuration *c, struct usb_function *f)
+{
+	struct projector_dev	*dev = func_to_dev(f);
+	struct usb_request *req;
+
+	spin_lock_irq(&dev->lock);
+
+	while ((req = req_get(dev, &dev->tx_idle)))
+		projector_request_free(req, dev->ep_in);
+	while ((req = req_get(dev, &dev->rx_idle)))
+		projector_request_free(req, dev->ep_out);
+
+	dev->online = 0;
+	dev->error = 1;
+	spin_unlock_irq(&dev->lock);
+}
+
 static int projector_function_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
@@ -758,6 +776,7 @@ static int projector_bind_config(struct usb_configuration *c)
 	dev->function.hs_descriptors = hs_projector_descs;
 	dev->function.bind = projector_function_bind;
 	dev->function.unbind = projector_function_unbind;
+	dev->function.release = projector_function_release;
 	dev->function.set_alt = projector_function_set_alt;
 	dev->function.disable = projector_function_disable;
 

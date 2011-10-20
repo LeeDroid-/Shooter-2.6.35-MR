@@ -62,9 +62,9 @@
 #define CFG_GET_ISO             51
 #define CFG_GET_EXP_GAIN	52
 #define CFG_SET_FRAMERATE 	53
-#define CFG_SENSOR_INIT			54
+#define CFG_SENSOR_INIT		54
 #define CFG_GET_3D_CALI_DATA 	55
-#define CFG_GET_CALIB_DATA		56
+#define CFG_GET_CALIB_DATA	56
 #define CFG_MAX                 57
 
 
@@ -77,7 +77,7 @@
 #define SENSOR_SNAPSHOT_MODE		1
 #define SENSOR_RAW_SNAPSHOT_MODE	2
 #define SENSOR_VIDEO_MODE	3
-#define SENSOR_VIDEO_120FPS_MODE	4
+#define SENSOR_VIDEO_60FPS_MODE	4
 #define SENSOR_GET_EXP 5
 #define SENSOR_HFR_60FPS_MODE 6
 #define SENSOR_HFR_90FPS_MODE 7
@@ -102,7 +102,6 @@
 
 #define CAMERA_3D_MODE 0
 #define CAMERA_2D_MODE 1
-
 
 struct sensor_pict_fps {
 	uint16_t prevfps;
@@ -136,7 +135,6 @@ struct wb_info_cfg {
 	uint16_t blue_gain;
 };
 
-
 /*Becker for AWB calibration*/
 struct fuse_id{
 	uint32_t fuse_id_word1;
@@ -154,7 +152,6 @@ struct reg_addr_val_pair_struct {
 struct lsc_cfg{
 	struct reg_addr_val_pair_struct lsc_table[144]; /*OV LSC table*/
 };
-
 
 // For 2nd CAM (mt9v113)
 enum antibanding_mode{
@@ -388,9 +385,6 @@ struct sensor_cfg_data {
 		enum sensor_af_mode af_mode_value;
 	} cfg;
 };
-
-
-
 
 #define GET_NAME			0
 #define GET_PREVIEW_LINE_PER_FRAME	1

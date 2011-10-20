@@ -24,12 +24,14 @@
 #include <mach/camera-8x60.h>
 #include <mach/msm_reqs.h>
 #include <asm/atomic.h>
-
 #include "msm_vfe_8x60.h"
 #include "msm_vpe1_8x60.h"
-
+#include <mach/clk.h>
+#include <linux/clk.h>
 
 static atomic_t irq_cnt;
+
+#define BUS_RATE_DEBUG 1
 
 #define CHECKED_COPY_FROM_USER(in) {					\
 	if (copy_from_user((in), (void __user *)cmd->value,		\
@@ -42,6 +44,9 @@ static atomic_t irq_cnt;
 static struct vfe31_ctrl_type *vfe31_ctrl;
 static struct msm_camera_io_clk camio_clk;
 static void  *vfe_syncdata;
+#ifdef BUS_RATE_DEBUG
+static struct work_struct workq;
+#endif
 static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id);
 static int32_t gamma_flag;
 static int32_t luma_flag;
@@ -374,10 +379,10 @@ static void vfe31_proc_ops(enum VFE31_MESSAGE_ID id, void *msg, size_t len)
 	rp = vfe31_ctrl->resp->vfe_alloc(sizeof(struct msm_vfe_resp),
 		vfe31_ctrl->syncdata, GFP_ATOMIC);
 	if (!rp) {
-		CDBG("rp: cannot allocate buffer\n");
+		CDBG("[CAM] rp: cannot allocate buffer\n");
 		return;
 	}
-	CDBG("vfe31_proc_ops, msgId = %d\n", id);
+	CDBG("[CAM] vfe31_proc_ops, msgId = %d\n", id);
 	rp->evt_msg.type   = MSM_CAMERA_MSG;
 	rp->evt_msg.msg_id = id;
 	rp->evt_msg.len    = len;
@@ -517,23 +522,23 @@ static void vfe_send_outmsg(uint8_t msgid, uint32_t pyaddr,
 		&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
 		if (msgid == MSG_ID_OUTPUT_T) {
 			if (vfe31_ctrl->outpath.out0.capture_cnt) {
-				pr_info("%s: Store T vMsg for later use.\n",
+				pr_info("[CAM] %s: Store T vMsg for later use.\n",
 					__func__);
 				vfe31_ctrl->vMsgHold_Thumb = msg;
 				return;
 			} else {
-				pr_info("%s: Retrieve stored T vMsg.\n",
+				pr_info("[CAM] %s: Retrieve stored T vMsg.\n",
 					__func__);
 				msg = vfe31_ctrl->vMsgHold_Thumb;
 			}
 		} else if (msgid == MSG_ID_OUTPUT_S) {
 			if (vfe31_ctrl->outpath.out1.capture_cnt) {
-				pr_info("%s: Store S vMsg for later use.\n",
+				pr_info("[CAM] %s: Store S vMsg for later use.\n",
 					__func__);
 				vfe31_ctrl->vMsgHold_Snap = msg;
 				return;
 			} else {
-				pr_info("%s: Retrieve stored S vMsg.\n",
+				pr_info("[CAM] %s: Retrieve stored S vMsg.\n",
 					__func__);
 				msg = vfe31_ctrl->vMsgHold_Snap;
 			}
@@ -552,10 +557,7 @@ static void vfe31_stop(void)
 {
 	uint8_t  axiBusyFlag = true;
 	unsigned long flags;
-	if(vfe31_ctrl == NULL){
-		pr_err("vfe31_stop vfe31_ctrl pointer is NULL");
-		return ;
-	}
+
 	spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
 	if (vfe31_ctrl->vstate == VFE_STATE_IDLE) {
 		spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
@@ -640,7 +642,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 
 	p = ao + 2;
 
-	CDBG("vfe31_config_axi: mode = %d, bufnum1 = %d, bufnum2 = %d\n",
+	CDBG("[CAM] vfe31_config_axi: mode = %d, bufnum1 = %d, bufnum2 = %d\n",
 		mode, ad->bufnum1, ad->bufnum2);
 
 	switch (mode) {
@@ -669,7 +671,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		outp1->free_buf.y_off = regp1->info.y_off;
 		outp1->free_buf.cbcr_off = regp1->info.cbcr_off;
 
-		CDBG("vfe31_config_axi: free_buf paddr = 0x%x, y_off = %d,"
+		CDBG("[CAM] vfe31_config_axi: free_buf paddr = 0x%x, y_off = %d,"
 			" cbcr_off = %d\n",
 			outp1->free_buf.paddr, outp1->free_buf.y_off,
 			outp1->free_buf.cbcr_off);
@@ -709,21 +711,21 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 			if (p_sync->stereocam_enabled
 				&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
 				temp = p1 - 1;
-				pr_info("%s: Thumb L Y_paddr 0x%x\n", __func__,
+				pr_info("[CAM] %s: Thumb L Y_paddr 0x%x\n", __func__,
 					*temp);
 				temp = ao + 9;
 				tempWidth = *temp;
-				pr_info("%s: T tempW with linesPerImage 0x%x\n",
+				pr_info("[CAM] %s: T tempW with linesPerImage 0x%x\n",
 					__func__, tempWidth);
 				tempWidth >>= 16;
-				pr_info("%s: T tempW before extraction 0x%x\n",
+				pr_info("[CAM] %s: T tempW before extraction 0x%x\n",
 					__func__, tempWidth);
 				tempWidth = (tempWidth + 1) * 16;
-				pr_info("%s: T tempW after extraction 0x%x\n",
+				pr_info("[CAM] %s: T tempW after extraction 0x%x\n",
 					__func__, tempWidth);
 				*p1 = (regp1->paddr + regp1->info.y_off +
 					tempWidth);
-				pr_info("%s: Thumb R Y_paddr 0x%x\n", __func__,
+				pr_info("[CAM] %s: Thumb R Y_paddr 0x%x\n", __func__,
 					*p1);
 			} else {
 				/* this is to duplicate ping address to pong.*/
@@ -732,17 +734,17 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 
 			p1 = ao + 30;  /* wm4 ping */
 			*p1++ = (regp1->paddr + regp1->info.cbcr_off);
-			pr_info("%s: regp1->info.cbcr_off = 0x%x\n", __func__,
+			pr_info("[CAM] %s: regp1->info.cbcr_off = 0x%x\n", __func__,
 						 regp1->info.cbcr_off);
 
 			if (p_sync->stereocam_enabled
 				&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
 				temp = p1 - 1;
-				pr_info("%s: Thumb L CBCR_paddr 0x%x\n",
+				pr_info("[CAM] %s: Thumb L CBCR_paddr 0x%x\n",
 					__func__, *temp);
 				*p1 = (regp1->paddr + regp1->info.cbcr_off +
 					tempWidth);
-				pr_info("%s: Thumb R CBCR_paddr 0x%x\n",
+				pr_info("[CAM] %s: Thumb R CBCR_paddr 0x%x\n",
 					 __func__, *p1);
 			} else {
 				/* this is to duplicate ping address to pong.*/
@@ -755,21 +757,21 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 			if (p_sync->stereocam_enabled
 				&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
 				temp = p1 - 1;
-				pr_info("%s: MainImg L Y_paddr 0x%x\n",
+				pr_info("[CAM] %s: MainImg L Y_paddr 0x%x\n",
 					__func__, *temp);
 				temp = ao + 15;
 				tempWidth = *temp;
-				pr_info("%s: S tempW with linesPerImage 0x%x\n",
+				pr_info("[CAM] %s: S tempW with linesPerImage 0x%x\n",
 					__func__, tempWidth);
 				tempWidth >>= 16;
-				pr_info("%s: S tempW before extraction 0x%x\n",
+				pr_info("[CAM] %s: S tempW before extraction 0x%x\n",
 					__func__, tempWidth);
 				tempWidth = (tempWidth + 1) * 16;
-				pr_info("%s: S tempW after extraction 0x%x\n",
+				pr_info("[CAM] %s: S tempW after extraction 0x%x\n",
 					__func__, tempWidth);
 				*p1 = (regp2->paddr + regp2->info.y_off +
 					tempWidth);
-				pr_info("%s: S R Y_paddr 0x%x\n",
+				pr_info("[CAM] %s: S R Y_paddr 0x%x\n",
 					__func__, *p1);
 			} else {
 				/* pong = ping,*/
@@ -778,17 +780,17 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 
 			p1 = ao + 36;  /* wm5 */
 			*p1++ = (regp2->paddr + regp2->info.cbcr_off);
-			pr_info("%s: regp2->info.cbcr_off = 0x%x\n", __func__,
+			pr_info("[CAM] %s: regp2->info.cbcr_off = 0x%x\n", __func__,
 						 regp2->info.cbcr_off);
 
 			if (p_sync->stereocam_enabled
 				&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
 				temp = p1 - 1;
-				pr_info("%s: MainImg L CBCR_paddr 0x%x\n",
+				pr_info("[CAM] %s: MainImg L CBCR_paddr 0x%x\n",
 					__func__, *temp);
 				*p1 = (regp2->paddr + regp2->info.cbcr_off +
 					tempWidth);
-				pr_info("%s: MainImg R CBCR_paddr 0x%x\n",
+				pr_info("[CAM] %s: MainImg R CBCR_paddr 0x%x\n",
 					__func__, *p1);
 			} else {
 				/* pong = ping,*/
@@ -871,12 +873,12 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		outp2->free_buf.paddr = regp2->paddr;
 		outp2->free_buf.y_off = regp2->info.y_off;
 		outp2->free_buf.cbcr_off = regp2->info.cbcr_off;
-		CDBG("vfe31_config_axi: preview free_buf"
+		CDBG("[CAM] vfe31_config_axi: preview free_buf"
 			"paddr = 0x%x, y_off = %d,"
 			" cbcr_off = %d\n",
 			outp1->free_buf.paddr, outp1->free_buf.y_off,
 			outp1->free_buf.cbcr_off);
-		CDBG("vfe31_config_axi: video free_buf"
+		CDBG("[CAM] vfe31_config_axi: video free_buf"
 			"paddr = 0x%x,y_off = %d,"
 			" cbcr_off = %d\n",
 			outp2->free_buf.paddr, outp2->free_buf.y_off,
@@ -886,7 +888,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 	case CAMIF_TO_AXI_VIA_OUTPUT_2: {  /* use wm0 only */
 		if (ad->bufnum2 < 1)
 			return -EINVAL;
-		CDBG("config axi for raw snapshot.\n");
+		CDBG("[CAM] config axi for raw snapshot.\n");
 		*p = 0x60;    /* raw snapshot with wm0 */
 		vfe31_ctrl->outpath.out1.ch0 = 0; /* raw */
 		regp1 = &(ad->region[ad->bufnum1]);
@@ -966,7 +968,7 @@ static void vfe31_reset(void)
 	uint32_t vfe_version;
 	vfe31_reset_internal_variables();
 	vfe_version = msm_io_r(vfe31_ctrl->vfebase);
-	CDBG("vfe_version = 0x%x\n", vfe_version);
+	CDBG("[CAM] vfe_version = 0x%x\n", vfe_version);
 	/* disable all interrupts.  vfeImaskLocal is also reset to 0
 	* to begin with. */
 	msm_io_w(VFE_DISABLE_ALL_IRQS,
@@ -1104,7 +1106,7 @@ static void vfe31_start_common(void){
 	unsigned long flags;
 
 	vfe31_ctrl->start_ack_pending = TRUE;
-	pr_info("VFE opertaion mode = 0x%x, output mode = 0x%x\n",
+	pr_info("[CAM] VFE opertaion mode = 0x%x, output mode = 0x%x\n",
 		vfe31_ctrl->operation_mode, vfe31_ctrl->outpath.output_mode);
 	msm_io_w(0x00EFE021, vfe31_ctrl->vfebase + VFE_IRQ_MASK_0);
 	msm_io_w(VFE_IMASK_WHILE_STOPPING_1,
@@ -1177,7 +1179,7 @@ static void vfe31_liveshot(void){
 static void vfe31_stereocam(uint32_t enable){
 	struct msm_sync* p_sync = (struct msm_sync *)vfe_syncdata;
 	if (p_sync) {
-		CDBG("%s: Enable StereoCam %d!!!\n", __func__, enable);
+		CDBG("[CAM] %s: Enable StereoCam %d!!!\n", __func__, enable);
 		p_sync->stereocam_enabled = enable;
 	}
 }
@@ -1248,7 +1250,7 @@ static int vfe31_capture(uint32_t num_frames_capture)
 				20 + 24 * (vfe31_ctrl->outpath.out1.ch1));
 		}
 	} else {  /* this is raw snapshot mode. */
-		CDBG("config the comp imask for raw snapshot mode. \n");
+		CDBG("[CAM] config the comp imask for raw snapshot mode. \n");
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_S) {
 			irq_comp_mask |=
 			(0x1 << (vfe31_ctrl->outpath.out1.ch0 + 8));
@@ -1275,7 +1277,7 @@ static int vfe31_capture(uint32_t num_frames_capture)
 #endif
 	if (p_sync->stereocam_enabled
 		&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
-		pr_info("vfe send snapshot command\n");
+		pr_info("[CAM] vfe send snapshot command\n");
 		p_sync->cdata.cfgtype = CFG_SET_MODE;
 		p_sync->cdata.mode = SENSOR_SNAPSHOT_MODE;
 		p_sync->sctrl.temp_s_config(&p_sync->cdata);
@@ -1297,7 +1299,7 @@ static int vfe31_capture(uint32_t num_frames_capture)
 	/*for sp3d only*/
 	if (p_sync->stereocam_enabled
 		&& (strcmp(vfe31_ctrl->s_info->sensor_name,"sp3d") == 0)) {
-		pr_info("vfe snapshot config done, send command to get L frame");	
+		pr_info("[CAM] vfe snapshot config done, send command to get L frame");	
 		p_sync->cdata.cfgtype = CFG_GET_SP3D_L_FRAME;
 		p_sync->sctrl.temp_s_config(&p_sync->cdata);	
 	}
@@ -1360,11 +1362,11 @@ static void vfe31_update(void)
 {
 	unsigned long flags;
 	uint32_t temp;
-	CDBG("vfe31_update\n");
+	CDBG("[CAM] vfe31_update\n");
 
 	if(gamma_flag == true) {
 		temp = msm_io_r(vfe31_ctrl->vfebase + V31_RGB_G_OFF);
-		CDBG("%s: gamma bank %d\n", __func__, (temp != 0));
+		CDBG("[CAM] %s: gamma bank %d\n", __func__, (temp != 0));
 
 		if(temp == 0)
 			msm_io_w(7, vfe31_ctrl->vfebase + V31_RGB_G_OFF);
@@ -1418,7 +1420,7 @@ static void vfe31_sync_timer_start(const uint32_t *tbl)
 	vfe31_ctrl->sync_timer_state = *tbl++;
 	vfe31_ctrl->sync_timer_repeat_count = *tbl++;
 	vfe31_ctrl->sync_timer_number = *tbl++;
-	CDBG("%s timer_state %d, repeat_cnt %d timer number %d\n",
+	CDBG("[CAM] %s timer_state %d, repeat_cnt %d timer number %d\n",
 		 __func__, vfe31_ctrl->sync_timer_state,
 		 vfe31_ctrl->sync_timer_repeat_count,
 		 vfe31_ctrl->sync_timer_number);
@@ -1426,7 +1428,7 @@ static void vfe31_sync_timer_start(const uint32_t *tbl)
 	if (vfe31_ctrl->sync_timer_state) { /* Start Timer */
 		value = value << vfe31_ctrl->sync_timer_number;
 	} else { /* Stop Timer */
-		CDBG("Failed to Start timer\n");
+		CDBG("[CAM] Failed to Start timer\n");
 		 return;
 	}
 
@@ -1445,7 +1447,7 @@ static void vfe31_sync_timer_start(const uint32_t *tbl)
 	val = camio_clk.vfe_clk_rate / 10000;
 	val = 10000000 / val;
 	val = value * 10000 / val;
-	CDBG("%s: Pixel Clk Cycles!!! %d \n", __func__, val);
+	CDBG("[CAM] %s: Pixel Clk Cycles!!! %d \n", __func__, val);
 	msm_io_w(val, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF +
 		12 + ((vfe31_ctrl->sync_timer_number) * 12));
 	/* Timer0 Active High/LOW */
@@ -1512,15 +1514,15 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 	uint32_t stereo_cam_enable = 0;
 	struct msm_sync* p_sync = (struct msm_sync *)vfe_syncdata;
 
-	CDBG("vfe31_proc_general: cmdID = %s, length = %d\n",
+	CDBG("[CAM] vfe31_proc_general: cmdID = %s, length = %d\n",
 		vfe31_general_cmd[cmd->id], cmd->length);
 	switch (cmd->id) {
 	case V31_RESET:
-		pr_info("vfe31_proc_general: V31_RESET\n");
+		pr_info("[CAM] vfe31_proc_general: V31_RESET\n");
 		vfe31_reset();
 		break;
 	case V31_START:
-		pr_info("vfe31_proc_general: V31_START\n");
+		pr_info("[CAM] vfe31_proc_general: V31_START\n");
 		atomic_set(&p_sync->stereo_snap_state,STEREO_SNAP_IDLE);
 		p_sync->vfeState = VFE_STATE_ACTIVE;
 		rc = vfe31_start();
@@ -1530,7 +1532,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		vfe31_update();
 		break;
 	case V31_CAPTURE:
-		pr_info("vfe31_proc_general: cmdID = V31_CAPTURE\n");
+		pr_info("[CAM] vfe31_proc_general: cmdID = V31_CAPTURE\n");
 		if (copy_from_user(&snapshot_cnt, (void __user *)(cmd->value),
 				sizeof(uint32_t))) {
 			rc = -EFAULT;
@@ -1539,14 +1541,14 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		rc = vfe31_capture(snapshot_cnt);
 		break;
 	case V31_START_RECORDING:
-		pr_info("vfe31_proc_general: V31_START_RECORDING\n");
+		pr_info("[CAM] vfe31_proc_general: V31_START_RECORDING\n");
 		rc = vfe31_start_recording();
 		if (p_sync->stereocam_enabled) {
 			p_sync->vfeRecordState = VFE_STATE_ACTIVE;
 		}
 		break;
 	case V31_STOP_RECORDING:
-		pr_info("vfe31_proc_general: V31_STOP_RECORDING\n");
+		pr_info("[CAM] vfe31_proc_general: V31_STOP_RECORDING\n");
 		rc = vfe31_stop_recording();
 		if (p_sync->stereocam_enabled) {
 			p_sync->vfeRecordState = VFE_STATE_IDLE;
@@ -1818,7 +1820,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 			vfe31_ctrl->vfebase + VFE_DMI_DATA_LO);
 			cmdp_local++;
 		}
-		CDBG("done writing init table \n");
+		CDBG("[CAM] done writing init table \n");
 		/* by default, always starts with offset 0. */
 		msm_io_w(LENS_ROLL_OFF_DELTA_TABLE_OFFSET,
 		vfe31_ctrl->vfebase + VFE_DMI_ADDR);
@@ -1850,7 +1852,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		msm_io_memcpy(vfe31_ctrl->vfebase + vfe31_cmd[cmd->id].offset,
 				cmdp, (vfe31_cmd[cmd->id].length));
 
-		CDBG("****************V31_LA_CFG*********\n");
+		CDBG("[CAM] ****************V31_LA_CFG*********\n");
 		cmdp += 1;
 		vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK0 , cmdp);
 		cmdp -= 1;
@@ -1875,11 +1877,11 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 
 		cmdp += 1;
 		if (old_val != 0x0){
-			CDBG("V31_LA_UPDATE, ch 0\n");
+			CDBG("[CAM] V31_LA_UPDATE, ch 0\n");
 			vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK0 , cmdp);
 		}
 		else{
-			CDBG("V31_LA_UPDATE, ch 1\n");
+			CDBG("[CAM] V31_LA_UPDATE, ch 1\n");
 			vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK1 , cmdp);
 		}
 		luma_flag = true;
@@ -1906,7 +1908,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		break;
 
 	case V31_LIVESHOT:
-		CDBG("vfe31_proc_general: cmdID = %s\n",
+		CDBG("[CAM] vfe31_proc_general: cmdID = %s\n",
 			vfe31_general_cmd[cmd->id]);
 		vfe31_liveshot();
 		break;
@@ -1935,7 +1937,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		msm_io_memcpy(vfe31_ctrl->vfebase + V31_RGB_G_OFF,
 				cmdp, 4);
 		cmdp += 1;
-		CDBG("V31_RGB_G_CFG, write bank 0\n");
+		CDBG("[CAM] V31_RGB_G_CFG, write bank 0\n");
 		vfe31_write_gamma_cfg(RGBLUT_CHX_BANK0 , cmdp);
 		cmdp -= 1;
 		}
@@ -1957,10 +1959,10 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		cmdp += 1;
 
 		if (!old_val) {
-			CDBG("V31_RGB_G_UPDATE, vfe using bank 0\n");
+			CDBG("[CAM] V31_RGB_G_UPDATE, vfe using bank 0\n");
 			vfe31_write_gamma_cfg(RGBLUT_CHX_BANK1 , cmdp);
 		} else {
-			CDBG("V31_RGB_G_UPDATE, vfe using bank 1 \n");
+			CDBG("[CAM] V31_RGB_G_UPDATE, vfe using bank 1 \n");
 			vfe31_write_gamma_cfg(RGBLUT_CHX_BANK0 , cmdp);
 		}
 		gamma_flag = true;
@@ -2014,7 +2016,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		}
 		break;
 	case V31_STOP:
-		pr_info("vfe31_proc_general: V31_STOP\n");
+		pr_info("[CAM] vfe31_proc_general: V31_STOP\n");
 		p_sync->vfeState = VFE_STATE_IDLE;
 		vfe31_stop();
 		break;
@@ -2121,7 +2123,7 @@ static int vfe31_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 		if (copy_from_user(&vfecmd,
 				(void __user *)(cmd->value),
 				sizeof(vfecmd))) {
-			pr_err("%s %d: copy_from_user failed\n", __func__,
+			pr_err("[CAM] %s %d: copy_from_user failed\n", __func__,
 				__LINE__);
 			return -EFAULT;
 		}
@@ -2140,7 +2142,7 @@ static int vfe31_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 			}
 	}
 
-	CDBG("%s: cmdType = %d\n", __func__, cmd->cmd_type);
+	CDBG("[CAM] %s: cmdType = %d\n", __func__, cmd->cmd_type);
 
 	if ((cmd->cmd_type == CMD_STATS_AF_ENABLE)    ||
 		(cmd->cmd_type == CMD_STATS_AWB_ENABLE)   ||
@@ -2208,10 +2210,10 @@ static int vfe31_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 		b = (struct msm_frame *)(cmd->value);
 		p = *(unsigned long *)data;
 
-		CDBG("CMD_FRAME_BUF_RELEASE b->path = %d\n", b->path);
+		CDBG("[CAM] CMD_FRAME_BUF_RELEASE b->path = %d\n", b->path);
 
 		if (b->path & OUTPUT_TYPE_P) {
-			CDBG("CMD_FRAME_BUF_RELEASE got free buffer\n");
+			CDBG("[CAM] CMD_FRAME_BUF_RELEASE got free buffer\n");
 			fbuf = &vfe31_ctrl->outpath.out0.free_buf;
 		} else if (b->path & OUTPUT_TYPE_S) {
 			fbuf = &vfe31_ctrl->outpath.out1.free_buf;
@@ -2366,7 +2368,7 @@ vfe31_config_done:
 		kfree(scfg);
 	if(sack)
 		kfree(sack);
-	CDBG("%s done: rc = %d\n", __func__, (int) rc);
+	CDBG("[CAM] %s done: rc = %d\n", __func__, (int) rc);
 	return rc;
 }
 
@@ -2383,9 +2385,9 @@ static inline void vfe31_read_irq_status(struct vfe31_irq_status *out)
 	temp = (uint32_t *)(vfe31_ctrl->vfebase + VFE_CAMIF_STATUS);
 	out->camifStatus = msm_io_r(temp);
 	#if 0
-	pr_info("camifStatus  = 0x%x\n", out->camifStatus);
-	pr_info("vfeIrqStatus0  = 0x%x\n", out->vfeIrqStatus0);
-	pr_info("vfeIrqStatus1  = 0x%x\n", out->vfeIrqStatus1);
+	pr_info("[CAM] camifStatus  = 0x%x\n", out->camifStatus);
+	pr_info("[CAM] vfeIrqStatus0  = 0x%x\n", out->vfeIrqStatus0);
+	pr_info("[CAM] vfeIrqStatus1  = 0x%x\n", out->vfeIrqStatus1);
 	#endif
 	/* clear the pending interrupt of the same kind.*/
 	msm_io_w(out->vfeIrqStatus0, vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_0);
@@ -2401,7 +2403,7 @@ static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id)
 {
 	struct vfe_message msg;
 
-	CDBG("vfe31_send_msg_no_payload\n");
+	CDBG("[CAM] vfe31_send_msg_no_payload\n");
 	msg._d = id;
 	vfe31_proc_ops(id, &msg, 0);
 }
@@ -2442,7 +2444,7 @@ static void vfe31_process_reg_update_irq(void)
 			msm_io_w(old_val,
 				vfe31_ctrl->vfebase + VFE_MODULE_CFG);
 		}
-		pr_info("start video triggered .\n");
+		pr_info("[CAM] start video triggered .\n");
 	} else if (vfe31_ctrl->req_stop_video_rec) {
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_V) {
 			msm_io_w(0, vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
@@ -2475,10 +2477,10 @@ static void vfe31_process_reg_update_irq(void)
 		msm_io_w(old_val,
 				vfe31_ctrl->vfebase + VFE_MODULE_CFG);
 
-		pr_info("stop video triggered .\n");
+		pr_info("[CAM] stop video triggered .\n");
 	}
 	if (vfe31_ctrl->start_ack_pending == TRUE) {
-		pr_info("irq startAckIrq\n");
+		pr_info("[Glenn][CAM] irq startAckIrq\n");
 		vfe31_send_msg_no_payload(MSG_ID_START_ACK);
 		vfe31_ctrl->start_ack_pending = FALSE;
 	} else {
@@ -2500,11 +2502,11 @@ static void vfe31_process_reg_update_irq(void)
 		if (vfe31_ctrl->vfe_capture_count == 0) {
 
 			if (vfe31_ctrl->s_info == NULL) {
-				pr_info("s_info is NULL\n");
+				pr_info("[CAM] s_info is NULL\n");
 			} else {
 				vfe31_ctrl->s_info->kpi_sensor_end =
 				ktime_to_ns(ktime_get());
-				pr_info("KPI PA: get raw snapshot, %u ms\n",
+				pr_info("[CAM] KPI PA: get raw snapshot, %u ms\n",
 					(vfe31_ctrl->s_info->kpi_sensor_end -
 					vfe31_ctrl->s_info->kpi_sensor_start)/
 					(1000*1000));
@@ -2617,7 +2619,7 @@ static void vfe31_process_camif_sof_irq(void)
 	uint32_t  temp;
 	if (vfe31_ctrl->operation_mode == 3) {  /* in raw snapshot mode */
 		if (vfe31_ctrl->start_ack_pending) {
-			pr_info("irq startAckIrq\n");
+			pr_info("[CAM] irq startAckIrq\n");
 			vfe31_send_msg_no_payload(MSG_ID_START_ACK);
 			vfe31_ctrl->start_ack_pending = FALSE;
 		}
@@ -2634,7 +2636,7 @@ static void vfe31_process_camif_sof_irq(void)
 	} /* if raw snapshot mode. */
 	vfe31_send_msg_no_payload(MSG_ID_SOF_ACK);
 	vfe31_ctrl->vfeFrameId++;
-	CDBG("camif_sof_irq, frameId = %d\n", vfe31_ctrl->vfeFrameId);
+	CDBG("[CAM] camif_sof_irq, frameId = %d\n", vfe31_ctrl->vfeFrameId);
 
 	if (vfe31_ctrl->sync_timer_state) {
 		if (vfe31_ctrl->sync_timer_repeat_count == 0)
@@ -2651,10 +2653,10 @@ static void vfe31_process_error_irq(uint32_t errStatus)
 	int32_t read_val = 0xabcdabcd;
 
 	if (errStatus & VFE31_IMASK_CAMIF_ERROR) {
-		pr_err("vfe31_irq: camif errors\n");
+		pr_err("[CAM] vfe31_irq: camif errors\n");
 		temp = (uint32_t *)(vfe31_ctrl->vfebase + VFE_CAMIF_STATUS);
 		camifStatus = msm_io_r(temp);
-		pr_info("camifStatus  = 0x%x\n", camifStatus);
+		pr_info("[CAM] camifStatus  = 0x%x\n", camifStatus);
 #if 0 /*send camif error to userspace*/
 		if (vfe31_ctrl->operation_mode & 1)
 			vfe31_send_msg_no_payload(MSG_ID_CAMIF_ERROR);
@@ -2662,67 +2664,67 @@ static void vfe31_process_error_irq(uint32_t errStatus)
 	}
 
 	if (errStatus & VFE31_IMASK_STATS_CS_OVWR)
-		pr_err("vfe31_irq: stats cs overwrite\n");
+		pr_err("[CAM] vfe31_irq: stats cs overwrite\n");
 
 	if (errStatus & VFE31_IMASK_STATS_IHIST_OVWR)
-		pr_err("vfe31_irq: stats ihist overwrite\n");
+		pr_err("[CAM] vfe31_irq: stats ihist overwrite\n");
 
 	if (errStatus & VFE31_IMASK_REALIGN_BUF_Y_OVFL)
-		pr_err("vfe31_irq: realign bug Y overflow\n");
+		pr_err("[CAM] vfe31_irq: realign bug Y overflow\n");
 
 	if (errStatus & VFE31_IMASK_REALIGN_BUF_CB_OVFL)
-		pr_err("vfe31_irq: realign bug CB overflow\n");
+		pr_err("[CAM] vfe31_irq: realign bug CB overflow\n");
 
 	if (errStatus & VFE31_IMASK_REALIGN_BUF_CR_OVFL)
-		pr_err("vfe31_irq: realign bug CR overflow\n");
+		pr_err("[CAM] vfe31_irq: realign bug CR overflow\n");
 
 	if (errStatus & VFE31_IMASK_VIOLATION)
-		pr_err("vfe31_irq: violation interrupt\n");
+		pr_err("[CAM] vfe31_irq: violation interrupt\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_0_BUS_OVFL)
-		pr_err("vfe31_irq: image master 0 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 0 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_1_BUS_OVFL)
-		pr_err("vfe31_irq: image master 1 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 1 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_2_BUS_OVFL)
-		pr_err("vfe31_irq: image master 2 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 2 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_3_BUS_OVFL)
-		pr_err("vfe31_irq: image master 3 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 3 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_4_BUS_OVFL)
-		pr_err("vfe31_irq: image master 4 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 4 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_5_BUS_OVFL)
-		pr_err("vfe31_irq: image master 5 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 5 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_IMG_MAST_6_BUS_OVFL)
-		pr_err("vfe31_irq: image master 6 bus overflow\n");
+		pr_err("[CAM] vfe31_irq: image master 6 bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_AE_BUS_OVFL)
-		pr_err("vfe31_irq: ae stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: ae stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_AF_BUS_OVFL)
-		pr_err("vfe31_irq: af stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: af stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_AWB_BUS_OVFL)
-		pr_err("vfe31_irq: awb stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: awb stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_RS_BUS_OVFL)
-		pr_err("vfe31_irq: rs stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: rs stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_CS_BUS_OVFL)
-		pr_err("vfe31_irq: cs stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: cs stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_IHIST_BUS_OVFL)
-		pr_err("vfe31_irq: ihist stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: ihist stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_STATS_SKIN_BUS_OVFL)
-		pr_err("vfe31_irq: skin stats bus overflow\n");
+		pr_err("[CAM] vfe31_irq: skin stats bus overflow\n");
 
 	if (errStatus & VFE31_IMASK_AXI_ERROR)
-		pr_err("vfe31_irq: axi error\n");
+		pr_err("[CAM] vfe31_irq: axi error\n");
 
     /* read status too when overflow happens.  This is foe debug only.*/
 	read_val = msm_io_r(vfe31_ctrl->vfebase + 0x0180);
@@ -2772,7 +2774,7 @@ static void vfe31_process_output_path_irq_0(void)
 	free buffer.
 	*/
 	if (vfe31_ctrl->s_info == NULL) {
-		pr_info("[CAM]s_info is NULL\n");
+		pr_info("[CAM] [CAM]s_info is NULL\n");
 	} else {
 		if (vfe31_ctrl->s_info->preview_skip_frame)
 			if (vfe31_ctrl->s_info->preview_skip_frame())
@@ -2794,7 +2796,7 @@ static void vfe31_process_output_path_irq_0(void)
 		pcbcraddr = vfe31_get_ch_addr(ping_pong,
 			vfe31_ctrl->outpath.out0.ch1);
 
-		CDBG("output path 0, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		CDBG("[CAM] output path 0, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
 			pyaddr, pcbcraddr);
 		if (vfe31_ctrl->outpath.out0.free_buf.available) {
 			/* Y channel */
@@ -2824,10 +2826,10 @@ static void vfe31_process_output_path_irq_0(void)
 	} else {
 		vfe31_ctrl->outpath.out0.frame_drop_cnt++;
 		if (vfe31_ctrl->outpath.out0.frame_drop_cnt > 20) {
-			pr_err("path_irq_0 - no free buffer!\n");
-			pr_info("%s: op mode = %d, capture_cnt = %d\n", __func__,
+			pr_err("[CAM] path_irq_0 - no free buffer!\n");
+			pr_info("[CAM] %s: op mode = %d, capture_cnt = %d\n", __func__,
 		 			vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
-			pr_info("%s: output0.free_buf.available = %d\n", __func__,
+			pr_info("[CAM] %s: output0.free_buf.available = %d\n", __func__,
 					vfe31_ctrl->outpath.out0.free_buf.available);
 		}
 	}
@@ -2860,7 +2862,7 @@ static void vfe31_process_output_path_irq_1(void)
 			pcbcraddr = vfe31_get_ch_addr(ping_pong,
 				vfe31_ctrl->outpath.out1.ch1);
 
-			pr_info("snapshot main, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+			pr_info("[CAM] snapshot main, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
 				pyaddr, pcbcraddr);
 			if (vfe31_ctrl->outpath.out1.free_buf.available) {
 				/* Y channel */
@@ -2883,10 +2885,10 @@ static void vfe31_process_output_path_irq_1(void)
 		} else {
 			vfe31_ctrl->outpath.out1.frame_drop_cnt++;
 			if (vfe31_ctrl->outpath.out1.frame_drop_cnt > 20) {
-				pr_err("path_irq_1 - no free buffer!\n");
-				pr_info("%s: op mode = %d, capture_cnt = %d\n", __func__,
+				pr_err("[CAM] path_irq_1 - no free buffer!\n");
+				pr_info("[CAM] %s: op mode = %d, capture_cnt = %d\n", __func__,
 		 			vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
-				pr_info("%s: output1.free_buf.available = %d\n", __func__,
+				pr_info("[CAM] %s: output1.free_buf.available = %d\n", __func__,
 					vfe31_ctrl->outpath.out1.free_buf.available);
 			}
 	}
@@ -2908,9 +2910,9 @@ static void vfe31_process_output_path_irq_2(void)
 		(vfe31_ctrl->vfe_capture_count <= 1)) ||
 		(vfe31_ctrl->outpath.out2.free_buf.available);
 
-	CDBG("%s: op mode = %d, capture_cnt = %d\n", __func__,
+	CDBG("[CAM] %s: op mode = %d, capture_cnt = %d\n", __func__,
 		 vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
-	CDBG("%s: output2.free_buf.available = %d\n", __func__,
+	CDBG("[CAM] %s: output2.free_buf.available = %d\n", __func__,
 		 vfe31_ctrl->outpath.out2.free_buf.available);
 
 	if (out_bool) {
@@ -2924,7 +2926,7 @@ static void vfe31_process_output_path_irq_2(void)
 			pcbcraddr = vfe31_get_ch_addr(ping_pong,
 				vfe31_ctrl->outpath.out2.ch1);
 
-			CDBG("video output, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+			CDBG("[CAM] video output, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
 				pyaddr, pcbcraddr);
 
 			if (vfe31_ctrl->outpath.out2.free_buf.available) {
@@ -2944,10 +2946,10 @@ static void vfe31_process_output_path_irq_2(void)
 		} else {
 			vfe31_ctrl->outpath.out2.frame_drop_cnt++;
 			if (vfe31_ctrl->outpath.out2.frame_drop_cnt > 20) {
-				pr_info("path_irq_2 - no free buffer!\n");
-				pr_info("%s: op mode = %d, capture_cnt = %d\n", __func__,
+				pr_info("[CAM] path_irq_2 - no free buffer!\n");
+				pr_info("[CAM] %s: op mode = %d, capture_cnt = %d\n", __func__,
 		 			vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
-				pr_info("%s: output2.free_buf.available = %d\n", __func__,
+				pr_info("[CAM] %s: output2.free_buf.available = %d\n", __func__,
 					vfe31_ctrl->outpath.out2.free_buf.available);
 			}
 		}
@@ -2971,7 +2973,7 @@ static uint32_t  vfe31_process_stats_irq_common(uint32_t statsNum,
 		VFE_BUS_PING_PONG_STATUS))
 	& ((uint32_t)(1<<(statsNum + 7)))) >> (statsNum + 7);
 	/* stats bits starts at 7 */
-	CDBG("statsNum %d, pingpongStatus %d\n", statsNum, pingpongStatus);
+	CDBG("[CAM] statsNum %d, pingpongStatus %d\n", statsNum, pingpongStatus);
 	pingpongAddr =
 		((uint32_t)(vfe31_ctrl->vfebase +
 				VFE_BUS_STATS_PING_PONG_BASE)) +
@@ -3144,7 +3146,7 @@ static void vfe31_do_tasklet(unsigned long data)
 	struct vfe31_isr_queue_cmd *qcmd = NULL;
 	struct msm_sync* p_sync = (struct msm_sync *)vfe_syncdata;
 
-	CDBG("=== vfe31_do_tasklet start === \n");
+	CDBG("[CAM] === vfe31_do_tasklet start === \n");
 
 	while (atomic_read(&irq_cnt)) {
 		spin_lock_irqsave(&vfe31_ctrl->tasklet_lock, flags);
@@ -3165,17 +3167,17 @@ static void vfe31_do_tasklet(unsigned long data)
 		/* interrupt to be processed,  *qcmd has the payload.  */
 		if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_REG_UPDATE_MASK) {
-			CDBG("irq	regUpdateIrq\n");
+			CDBG("[CAM] irq	regUpdateIrq\n");
 			vfe31_process_reg_update_irq();
 		}
 #if 0/*debug log*/
 		if (qcmd->vfeInterruptStatus0 & 4) {
-			pr_info("EOF irq !\n");
+			pr_info("[CAM] EOF irq !\n");
 		}
 #endif
 		if (qcmd->vfeInterruptStatus1 &
 				VFE_IMASK_WHILE_STOPPING_1) {
-			pr_info("irq	resetAckIrq\n");
+			pr_info("[CAM] irq	resetAckIrq\n");
 			vfe31_process_reset_irq();
 		}
 
@@ -3183,27 +3185,32 @@ static void vfe31_do_tasklet(unsigned long data)
 		if (vfe31_ctrl->vstate == VFE_STATE_ACTIVE) {
 			/* irqs below are only valid when in active state. */
 			spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
+
 			if (qcmd->vfeInterruptStatus1 &
 					VFE31_IMASK_ERROR_ONLY_1) {
-				pr_err("irq	errorIrq\n");
+				pr_err("[CAM] irq	errorIrq\n");
 				vfe31_process_error_irq(
 					qcmd->vfeInterruptStatus1 &
 					VFE31_IMASK_ERROR_ONLY_1);
+
+#ifdef BUS_RATE_DEBUG
+					schedule_work(&workq);
+#endif
 			}
 			/* next, check output path related interrupts. */
 			if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK) {
-				CDBG("Image composite done 0 irq occured.\n");
+				CDBG("[CAM] Image composite done 0 irq occured.\n");
 				vfe31_process_output_path_irq_0();
 			}
 			if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE1_MASK) {
-				CDBG("Image composite done 1 irq occured.\n");
+				CDBG("[CAM] Image composite done 1 irq occured.\n");
 				vfe31_process_output_path_irq_1();
 			}
 			if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE2_MASK) {
-				CDBG("Image composite done 2 irq occured.\n");
+				CDBG("[CAM] Image composite done 2 irq occured.\n");
 				vfe31_process_output_path_irq_2();
 			}
 			/* in snapshot mode if done then send
@@ -3227,11 +3234,11 @@ static void vfe31_do_tasklet(unsigned long data)
 						&& (vfe31_ctrl->outpath.out1.capture_cnt == 1)
 						&& ((qcmd->vfeInterruptStatus0 & VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK)
 						|| (qcmd->vfeInterruptStatus0 & VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE1_MASK))) {
-					pr_info("sp3d get L frame done, send command to get R frame");
+					pr_info("[CAM] sp3d get L frame done, send command to get R frame");
 
 					/* Remove the dummy pixels from right frame */
 					temp_reg_data = msm_io_r(vfe31_ctrl->vfebase + V31_CAMIF_WIN_H_CFG_OFF);
-					pr_info("%s: L cfg = 0x%x, R cfg = 0x%x\n", __func__, temp_reg_data,
+					pr_info("[CAM] %s: L cfg = 0x%x, R cfg = 0x%x\n", __func__, temp_reg_data,
 									temp_reg_data - V31_CAMIF_SNAP_R_WIN_CFG_MASK);
 					msm_io_w_mb(temp_reg_data - V31_CAMIF_SNAP_R_WIN_CFG_MASK,
 						vfe31_ctrl->vfebase + V31_CAMIF_WIN_H_CFG_OFF);
@@ -3249,7 +3256,7 @@ static void vfe31_do_tasklet(unsigned long data)
 				/* process stats comb interrupt. */
 				if (qcmd->vfeInterruptStatus0 &
 					VFE_IRQ_STATUS0_STATS_COMPOSIT_MASK) {
-					CDBG("Stats composite irq occured.\n");
+					CDBG("[CAM] Stats composite irq occured.\n");
 					vfe31_process_stats_comb_irq(
 						&qcmd->vfeInterruptStatus0);
 				}
@@ -3257,49 +3264,49 @@ static void vfe31_do_tasklet(unsigned long data)
 				/* process individual stats interrupt. */
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_AEC) {
-					CDBG("Stats AEC irq occured.\n");
+					CDBG("[CAM] Stats AEC irq occured.\n");
 					vfe31_process_stats_ae_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_AWB) {
-					CDBG("Stats AWB irq occured.\n");
+					CDBG("[CAM] Stats AWB irq occured.\n");
 					vfe31_process_stats_awb_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_AF) {
-					CDBG("Stats AF irq occured.\n");
+					CDBG("[CAM] Stats AF irq occured.\n");
 					vfe31_process_stats_af_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_IHIST) {
-					CDBG("Stats IHIST irq occured.\n");
+					CDBG("[CAM] Stats IHIST irq occured.\n");
 					vfe31_process_stats_ihist_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_RS) {
-					CDBG("Stats RS irq occured.\n");
+					CDBG("[CAM] Stats RS irq occured.\n");
 					vfe31_process_stats_rs_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_STATS_CS) {
-					CDBG("Stats CS irq occured.\n");
+					CDBG("[CAM] Stats CS irq occured.\n");
 					vfe31_process_stats_cs_irq();
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_SYNC_TIMER0) {
-					CDBG("SYNC_TIMER 0 irq occured.\n");
+					CDBG("[CAM] SYNC_TIMER 0 irq occured.\n");
 					vfe31_send_msg_no_payload(
 						MSG_ID_SYNC_TIMER0_DONE);
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_SYNC_TIMER1) {
-					CDBG("SYNC_TIMER 1 irq occured.\n");
+					CDBG("[CAM] SYNC_TIMER 1 irq occured.\n");
 					vfe31_send_msg_no_payload(
 						MSG_ID_SYNC_TIMER1_DONE);
 				}
 				if (qcmd->vfeInterruptStatus0 &
 						VFE_IRQ_STATUS0_SYNC_TIMER2) {
-					CDBG("SYNC_TIMER 2 irq occured.\n");
+					CDBG("[CAM] SYNC_TIMER 2 irq occured.\n");
 					vfe31_send_msg_no_payload(
 						MSG_ID_SYNC_TIMER2_DONE);
 				}
@@ -3310,15 +3317,45 @@ static void vfe31_do_tasklet(unsigned long data)
 		}
 		if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
-			CDBG("irq	camifSofIrq\n");
+			CDBG("[CAM] irq	camifSofIrq\n");
 			vfe31_process_camif_sof_irq();
 		}
 		kfree(qcmd);
 	}
-	CDBG("=== vfe31_do_tasklet end === \n");
+	CDBG("[CAM] === vfe31_do_tasklet end === \n");
 }
 
 static DECLARE_TASKLET(vfe31_tasklet, vfe31_do_tasklet, 0);
+
+#ifdef BUS_RATE_DEBUG
+static void vfe31_do_workqueue(struct work_struct *work)
+{
+
+	struct clk *clk = NULL;
+	u32 rate = 0;
+
+	clk = clk_get(NULL, "mmfab_clk");
+	rate = clk_get_rate(clk);
+	pr_info("[CAM] [cam] mmfab_clk  = %d\n", rate);
+	clk_put(clk);
+
+	clk = clk_get(NULL, "smi_clk");
+	rate = clk_get_rate(clk);
+	pr_info("[CAM] [cam] smi_clk  = %d\n", rate);
+	clk_put(clk);
+
+	clk = clk_get(NULL, "ebi1_clk");
+	rate = clk_get_rate(clk);
+	pr_info("[CAM] [cam] ebi1_clk  = %d\n", rate);
+	clk_put(clk);
+
+	clk = clk_get(NULL, "vfe_clk");
+	rate = clk_get_rate(clk);
+	pr_info("[CAM] [cam] vfe_clk  = %d\n", rate);
+	clk_put(clk);
+
+}
+#endif
 
 static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 {
@@ -3326,19 +3363,19 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 	struct vfe31_irq_status irq;
 	struct vfe31_isr_queue_cmd *qcmd;
 
-	CDBG("vfe_parse_irq\n");
+	CDBG("[CAM] vfe_parse_irq\n");
 
 	vfe31_read_irq_status(&irq);
 
 	if ((irq.vfeIrqStatus0 == 0) && (irq.vfeIrqStatus1 == 0)) {
-		pr_info("vfe_parse_irq: vfeIrqStatus0 & 1 are both 0!\n");
+		pr_info("[CAM] vfe_parse_irq: vfeIrqStatus0 & 1 are both 0!\n");
 		return IRQ_HANDLED;
 	}
 
 	qcmd = kzalloc(sizeof(struct vfe31_isr_queue_cmd),
 		GFP_ATOMIC);
 	if (!qcmd) {
-		pr_err("vfe_parse_irq: qcmd malloc failed!\n");
+		pr_err("[CAM] vfe_parse_irq: qcmd malloc failed!\n");
 		return IRQ_HANDLED;
 	}
 
@@ -3349,7 +3386,7 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 	}
 	spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
 
-	CDBG("vfe_parse_irq: Irq_status0 = 0x%x, Irq_status1 = 0x%x.\n",
+	CDBG("[CAM] vfe_parse_irq: Irq_status0 = 0x%x, Irq_status1 = 0x%x.\n",
 		irq.vfeIrqStatus0, irq.vfeIrqStatus1);
 
 	qcmd->vfeInterruptStatus0 = irq.vfeIrqStatus0;
@@ -3361,6 +3398,7 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 	atomic_add(1, &irq_cnt);
 	spin_unlock_irqrestore(&vfe31_ctrl->tasklet_lock, flags);
 	tasklet_schedule(&vfe31_tasklet);
+
 	return IRQ_HANDLED;
 }
 
@@ -3368,12 +3406,15 @@ static void vfe31_release(struct platform_device *pdev)
 {
 	struct resource	*vfemem, *vfeio;
 
-	pr_info("%s, free_irq\n", __func__);
+	pr_info("[CAM] %s, free_irq\n", __func__);
 	free_irq(vfe31_ctrl->vfeirq, 0);
+#ifdef BUS_RATE_DEBUG
+	flush_scheduled_work();
+#endif
 	tasklet_kill(&vfe31_tasklet);
 
 	if (atomic_read(&irq_cnt))
-		pr_info("%s, Warning IRQ Count not ZERO\n", __func__);
+		pr_info("[CAM] %s, Warning IRQ Count not ZERO\n", __func__);
 
 	vfemem = vfe31_ctrl->vfemem;
 	vfeio  = vfe31_ctrl->vfeio;
@@ -3385,9 +3426,9 @@ static void vfe31_release(struct platform_device *pdev)
 	kfree(vfe31_ctrl);
 	vfe31_ctrl = NULL;
 	release_mem_region(vfemem->start, (vfemem->end - vfemem->start) + 1);
-	pr_info("%s, msm_camio_disable\n", __func__);
+	pr_info("[CAM] %s, msm_camio_disable\n", __func__);
 	msm_camio_disable(pdev);
-	pr_info("%s, msm_camio_set_perf_lvl\n", __func__);
+	pr_info("[CAM] %s, msm_camio_set_perf_lvl\n", __func__);
 	msm_camio_set_perf_lvl(S_EXIT);
 
 	vfe_syncdata = NULL;
@@ -3406,20 +3447,20 @@ static int vfe31_resource_init(struct msm_vfe_callback *presp,
 
 	vfemem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!vfemem) {
-		pr_err("%s: no mem resource?\n", __func__);
+		pr_err("[CAM] %s: no mem resource?\n", __func__);
 		return -ENODEV;
 	}
 
 	vfeirq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!vfeirq) {
-		pr_err("%s: no irq resource?\n", __func__);
+		pr_err("[CAM] %s: no irq resource?\n", __func__);
 		return -ENODEV;
 	}
 
 	vfeio = request_mem_region(vfemem->start,
 		resource_size(vfemem), pdev->name);
 	if (!vfeio) {
-		pr_err("%s: VFE region already claimed\n", __func__);
+		pr_err("[CAM] %s: VFE region already claimed\n", __func__);
 		return -EBUSY;
 	}
 
@@ -3435,7 +3476,7 @@ static int vfe31_resource_init(struct msm_vfe_callback *presp,
 		ioremap(vfemem->start, (vfemem->end - vfemem->start) + 1);
 	if (!vfe31_ctrl->vfebase) {
 		rc = -ENOMEM;
-		pr_err("%s: vfe ioremap failed\n", __func__);
+		pr_err("[CAM] %s: vfe ioremap failed\n", __func__);
 		goto cmd_init_failed2;
 	}
 
@@ -3492,7 +3533,7 @@ static int vfe31_init(struct msm_vfe_callback *presp,
 	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
 
-	pr_info("vfe31_init\n");
+	pr_info("[CAM] vfe31_init\n");
 
 	camio_clk = camdev->ioclk;
 
@@ -3504,7 +3545,11 @@ static int vfe31_init(struct msm_vfe_callback *presp,
 	msm_camio_set_perf_lvl(S_INIT);
 	msm_camio_set_perf_lvl(S_PREVIEW);
 	if (msm_vpe_open() < 0)
-		CDBG("%s: vpe_open failed\n", __func__);
+		CDBG("[CAM] %s: vpe_open failed\n", __func__);
+
+#ifdef BUS_RATE_DEBUG
+	INIT_WORK(&workq, vfe31_do_workqueue);
+#endif
 
 	/* TO DO: Need to release the VFE resources */
 	rc = request_irq(vfe31_ctrl->vfeirq, vfe31_parse_irq,

@@ -110,7 +110,7 @@
 	GPIOMUX_CFG(GPIOMUX_FUNC_GPIO, GPIOMUX_DRV_2MA, GPIOMUX_PULL_DOWN)
 
 #define UART9DM_ACTIVE \
-	GPIOMUX_CFG(GPIOMUX_FUNC_1, GPIOMUX_DRV_8MA , GPIOMUX_PULL_DOWN)
+	GPIOMUX_CFG(GPIOMUX_FUNC_1, GPIOMUX_DRV_8MA , GPIOMUX_PULL_NONE)
 
 #define MI2S_ACTIVE_CFG \
 	GPIOMUX_CFG(GPIOMUX_FUNC_1, GPIOMUX_DRV_2MA, GPIOMUX_PULL_NONE)
@@ -134,9 +134,9 @@
 #define CAM_SUSPEND_CFG GPIOMUX_CFG(0, 0, GPIOMUX_PULL_DOWN)
 
 #define MDM2AP_SYNC_ACTIVE_CFG \
-	GPIOMUX_CFG(GPIOMUX_FUNC_GPIO, GPIOMUX_DRV_2MA, GPIOMUX_PULL_NONE)
+	GPIOMUX_CFG(GPIOMUX_FUNC_GPIO, GPIOMUX_DRV_2MA, GPIOMUX_PULL_DOWN)
 #define MDM2AP_SYNC_SUSPEND_CFG \
-	GPIOMUX_CFG(0, 0, GPIOMUX_PULL_NONE)
+	GPIOMUX_CFG(0, 0, GPIOMUX_PULL_DOWN)
 
 static struct msm_gpiomux_config msm8x60_gsbi_configs[] __initdata = {
 	{
@@ -170,7 +170,7 @@ static struct msm_gpiomux_config msm8x60_gsbi_configs[] __initdata = {
 		},
 	},
 /* This pin in Rider and Shooter is not used, do not operate it. */
-#if !(defined(CONFIG_MACH_RIDER) || defined(CONFIG_MACH_SHOOTER) || defined(CONFIG_MACH_VIGOR))
+#if !(defined(CONFIG_MACH_RIDER) || defined(CONFIG_MACH_SHOOTER) || defined(CONFIG_MACH_VIGOR) || defined(CONFIG_MACH_VERDI_LTE))
 	{
 		.gpio      = 44,
 		.settings = {

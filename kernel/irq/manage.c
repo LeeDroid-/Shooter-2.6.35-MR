@@ -481,13 +481,13 @@ static irqreturn_t irq_default_primary_handler(int irq, void *dev_id)
 static irqreturn_t irq_nested_primary_handler(int irq, void *dev_id)
 {
 
-#ifdef CONFIG_MACH_SHOOTER
+#ifdef CONFIG_MACH_RIDER
 #ifdef CONFIG_WIMAX
-	if(irq==637)//wimax host_wake_irq
-	{/*we dnot want to pint code stack here*/
-		printk("[WiMAX] Primary handler called for nested irq\n");
-		return IRQ_NONE;
-	}
+       if(irq==637)//wimax host_wake_irq
+       {/*we dnot want to print code stack here*/
+       printk("[WiMAX] Primary handler called for nested irq\n");
+       return IRQ_NONE;
+       }
 #endif
 #endif
 	WARN(1, "Primary handler called for nested irq %d\n", irq);

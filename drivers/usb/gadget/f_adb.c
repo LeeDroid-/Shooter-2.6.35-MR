@@ -642,6 +642,31 @@ static void adb_function_disable(struct usb_function *f)
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
 
+static void
+adb_function_release(struct usb_configuration *c, struct usb_function *f)
+{
+	struct adb_dev  *dev = func_to_dev(f);
+	struct usb_request *req;
+
+#if 0
+	spin_lock_irq(&dev->lock);
+#endif
+	while ((req = req_get(dev, &dev->rx_done)))
+		adb_request_free(req, dev->ep_out);
+	while ((req = req_get(dev, &dev->rx_idle)))
+		adb_request_free(req, dev->ep_out);
+	while ((req = req_get(dev, &dev->tx_idle)))
+		adb_request_free(req, dev->ep_in);
+
+	dev->online = 0;
+	dev->error = 1;
+#if 0
+	dev->online = 0;
+	dev->error = 1;
+	spin_unlock_irq(&dev->lock);
+#endif
+}
+
 static int adb_bind_config(struct usb_configuration *c)
 {
 	struct adb_dev *dev;
@@ -674,6 +699,7 @@ static int adb_bind_config(struct usb_configuration *c)
 	dev->function.unbind = adb_function_unbind;
 	dev->function.set_alt = adb_function_set_alt;
 	dev->function.disable = adb_function_disable;
+	dev->function.release = adb_function_release;
 	dev->maxsize = 512;
 
 	/* start disabled */

@@ -42,6 +42,7 @@ enum TPA2051_Mode {
 #define TPA2051_READ_CONFIG	_IOW(TPA2051_IOCTL_MAGIC, 0x02, unsigned)
 #define TPA2051_SET_MODE        _IOW(TPA2051_IOCTL_MAGIC, 0x03, unsigned)
 #define TPA2051_SET_PARAM       _IOW(TPA2051_IOCTL_MAGIC, 0x04,  unsigned)
+#define TPA2051_WRITE_REG       _IOW(TPA2051_IOCTL_MAGIC, 0x07,  unsigned)
 
 void set_speaker_amp(int on);
 void set_headset_amp(int on);

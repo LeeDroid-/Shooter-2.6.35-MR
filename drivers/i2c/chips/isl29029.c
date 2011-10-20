@@ -707,12 +707,11 @@ static irqreturn_t isl29029_irq_handler(int irq, void *data)
 	value1 = gpio_get_value(lpi->intr_pin);
 	DPS("\n%s: intr_pin = %d, value of intr_pin = %d\n",
 		__func__, lpi->intr_pin, value1);*/
+	if (lpi->ps_enable == 1)
+		IPS("%s\n", __func__);
 
 	disable_irq_nosync(lpi->irq);
-
-	/*DPS("%s\n", __func__);*/
-
-	queue_work(lpi->lp_wq, &sensor_irq_work);
+	queue_work_on(0, lpi->lp_wq, &sensor_irq_work);
 
 	return IRQ_HANDLED;
 }

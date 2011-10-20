@@ -39,7 +39,6 @@ struct tps65200_chg_int_data {
 };
 
 struct tps65200_platform_data {
-	int charger_check;
 	int gpio_chg_stat;
 	int gpio_chg_int;
 	int dq_result;
@@ -50,6 +49,10 @@ struct tps65200_chg_int_notifier {
 	const char *name;
 	void (*func)(int int_reg, int value);
 };
+
+#if defined(CONFIG_MACH_HOLIDAY)
+extern u8 batt_charging_state;
+#endif
 
 #ifdef CONFIG_TPS65200
 extern int tps_set_charger_ctrl(u32 ctl);

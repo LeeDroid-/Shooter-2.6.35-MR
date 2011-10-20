@@ -1730,7 +1730,7 @@ static void binder_transaction(struct binder_proc *proc,
 					return_error = BR_FAILED_REPLY;
 					goto err_fd_not_allowed;
 				}
-			} else if (!target_node->accept_fds) {
+			} else if ((!target_node) || (!target_node->accept_fds)) {
 				binder_user_error("binder: %d:%d got transaction with fd, %ld, but target does not allow fds\n",
 					proc->pid, thread->pid, fp->handle);
 				return_error = BR_FAILED_REPLY;
@@ -1865,7 +1865,7 @@ int binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
 			    (cmd == BC_INCREFS || cmd == BC_ACQUIRE)) {
 				ref = binder_get_ref_for_node(proc,
 					       binder_context_mgr_node);
-				if (ref->desc != target) {
+				if ((ref != NULL) && (ref->desc != target)) {
 					binder_user_error("binder: %d:"
 						"%d tried to acquire "
 						"reference to desc 0, "
@@ -2646,14 +2646,18 @@ static unsigned int binder_poll(struct file *filp,
 {
 	struct binder_proc *proc = filp->private_data;
 	struct binder_thread *thread = NULL;
-	int wait_for_proc_work;
+	int wait_for_proc_work = 0;
 
 	mutex_lock(&binder_lock);
 	thread = binder_get_thread(proc);
-
-	wait_for_proc_work = thread->transaction_stack == NULL &&
-		list_empty(&thread->todo) && thread->return_error == BR_OK;
+	if (thread != NULL) {
+		wait_for_proc_work = thread->transaction_stack == NULL &&
+			list_empty(&thread->todo) && thread->return_error == BR_OK;
+	}
 	mutex_unlock(&binder_lock);
+
+	if (!thread)
+		return 0;
 
 	if (wait_for_proc_work) {
 		if (binder_has_proc_work(proc, thread))

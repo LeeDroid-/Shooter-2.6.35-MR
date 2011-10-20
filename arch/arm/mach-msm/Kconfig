@@ -365,6 +365,13 @@ config MACH_SUPERSONIC
 	help
 	  Select this to support the Supersonic device
 
+config MACH_OBOEA
+	depends on ARCH_QSD8X50
+	default n
+	bool "Oboea"
+	help
+	  Select this to support the Oboea device
+
 config MACH_BEE
 	depends on ARCH_MSM7225
 	default n
@@ -611,6 +618,22 @@ config MACH_TAGH
        help
          Support for the Qualcomm MSM7x30 Tag_h board.
 
+config MACH_BLISS
+       depends on ARCH_MSM7X30
+       depends on !MSM_STACKED_MEMORY
+       default n
+       bool "MSM7x30 BLISS"
+       help
+         Support for the Qualcomm MSM7x30 Bliss board.
+
+config MACH_BLISSC
+       depends on ARCH_MSM7X30
+       depends on !MSM_STACKED_MEMORY
+       default n
+       bool "MSM7x30 BLISSC"
+       help
+         Support for the Qualcomm MSM7x30 Blissc board.
+
 config MACH_PYRAMID
 		depends on ARCH_MSM8X60
 		default n
@@ -635,13 +658,13 @@ config MACH_SHOOTER
         help
           Support for the Shooter device.
 
-config MACH_SHOOTER_K
+config MACH_SHOOTER_CT
         depends on ARCH_MSM8X60
         default n
-        bool "Shooter_K"
+        bool "Shooter_CT"
         select SMP_PARALLEL_START
         help
-          Support for the Shooter_K device.
+          Support for the Shooter_CT device.
 
 config MACH_RIDER
         depends on ARCH_MSM8X60
@@ -722,7 +745,6 @@ config PHYS_OFFSET
 	default 0x20000000 if ARCH_QSD8X50
 	default 0x40400000 if ARCH_MSM8X60
 	default 0x10000000
-
 
 config KERNEL_PMEM_EBI_REGION
 	bool "Enable in-kernel PMEM region for EBI"
@@ -1748,6 +1770,12 @@ config MSM8X60_SSBI
 	  Enable support for SSBI bus. This is required for communicating with
 	  Qualcomm PMICs and Audio codecs.
 
+config MSM8X60_CAPSENSE
+	tristate "capsense support"
+	depends on ARCH_MSM8X60
+	help
+	  Enable support RPC for capsense.
+
 config RPC_SIZE_1024
     default n
     bool "set RPC size to 1024"
@@ -1922,6 +1950,27 @@ config SUPPORT_DQ_BATTERY
 config RADIO_FEEDBACK8660
 	bool
 	depends on ARCH_MSM8X60
+	default y
+
+comment "TI WLAN driver"
+config WIFI_CONTROL_FUNC
+        bool "Enable WiFi control function abstraction"
+        select WIRELESS_EXT
+        select WEXT_CORE
+        select WEXT_PROC
+        select WEXT_PRIV
+        default Y
+        help
+           Enables Power/Reset/Carddetect function abstraction
+
+config TIWLAN_SDIO
+        bool "TI WLAN Enhanced SDIO Contoller support"
+        help
+           Say Y here if you want to be able to use TI's WLAN device using the
+           SDIO interface. If unsure, say N.
+
+config MSM_KGSL_HC_MR1
+	bool "Use Honeycomb MR1 KGSL driver"
 	default n
 
 config MSM_SCHED_FAST_CPU_ONLINE

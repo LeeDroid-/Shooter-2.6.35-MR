@@ -12,10 +12,12 @@
 
 obj-$(CONFIG_SENSORS_AKM8973)	+= akm8973.o
 obj-$(CONFIG_SENSORS_AKM8975)   += akm8975.o
+obj-$(CONFIG_SENSORS_AKM8975_PANA_GYRO)   += akm8975_pana_gyro.o
 obj-$(CONFIG_SENSORS_AKM8976)	+= akm8976.o
 obj-$(CONFIG_SENSORS_BMA150)    += bma150.o
 obj-$(CONFIG_SENSORS_BMA250)	+= bma250.o
 obj-$(CONFIG_SENSORS_NFC_PN544) += pn544.o
+obj-$(CONFIG_SENSORS_PANASONIC_GYRO)	+= ewtzmu2.o
 
 obj-$(CONFIG_DS1682)		+= ds1682.o
 obj-$(CONFIG_SENSORS_PCA963X)	+= pca963x.o
@@ -34,6 +36,7 @@ obj-$(CONFIG_INPUT_ISL29029)	+= isl29029.o
 obj-$(CONFIG_SMB329)            += smb329.o
 obj-$(CONFIG_TPS65200)          += tps65200.o
 obj-$(CONFIG_INPUT_CAPELLA_CM3628)          += cm3628.o
+obj-$(CONFIG_INPUT_CAPELLA_CM3629)          += cm3629.o
 obj-$(CONFIG_SENSORS_CAPSENSE)	+= cap_sense.o
 obj-$(CONFIG_SENSORS_CAPSENSE_EXPRESS)	+= cap_sense_express.o
 

@@ -46,22 +46,6 @@ static unsigned int workqueue_debug_level = 0;
 static int wq_pos = 0;
 static unsigned long wq_hist[WQ_HIST_LEN];
 
-static int workqueue_boot_config(char *str)
-{
-	unsigned kernel_flag;
-
-	if (!str)
-		return -EINVAL;
-
-	kernel_flag = simple_strtoul(str, NULL, 16);
-	if (kernel_flag & BIT5)
-		workqueue_debug_level = 1;
-	else
-		workqueue_debug_level = 0;
-	return 0;
-}
-early_param("kernelflag", workqueue_boot_config);
-
 static int store_workqueue(const char *wq_name, unsigned long f_addr)
 {
 	char func_sym[KSYM_SYMBOL_LEN];
@@ -1287,8 +1271,14 @@ long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg)
 EXPORT_SYMBOL_GPL(work_on_cpu);
 #endif /* CONFIG_SMP */
 
+#include <mach/board_htc.h>
+
 void __init init_workqueues(void)
 {
+	/* Switch workqueue debug level by kernelflag */
+	if (get_kernel_flag() & BIT5)
+		workqueue_debug_level = 1;
+
 	alloc_cpumask_var(&cpu_populated_map, GFP_KERNEL);
 
 	cpumask_copy(cpu_populated_map, cpu_online_mask);

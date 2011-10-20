@@ -25,6 +25,7 @@
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/mutex.h>
+#include <linux/switch.h>
 #include <mach/clk.h>
 
 #include "msm_fb.h"
@@ -36,6 +37,7 @@
 #define HTC_SUPPORT_1080P30
 
 #define HDCP_COMPLIANCE
+#define HONEYCOMB_HDMI
 
 #define QFPROM_BASE		((uint32)hdmi_msm_state->qfprom_io)
 #define HDMI_BASE		((uint32)hdmi_msm_state->hdmi_io)
@@ -89,6 +91,9 @@ struct hdmi_msm_state_type {
 	struct completion hdcp_success_done;
 	struct timer_list hdcp_timer;
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
+#ifdef HONEYCOMB_HDMI
+	struct switch_dev hpd_switch;
+#endif
 
 	int irq;
 	struct msm_hdmi_platform_data *pd;
@@ -122,7 +127,6 @@ static void hdcp_deauthenticate(void);
 static int full_auth_proc_done;
 static int hpd_event_occured_while_authenticating ;
 static DEFINE_MUTEX(hdcp_auth_state_mutex);
-
 
 
 /* static to keep track of turn on */
@@ -368,14 +372,17 @@ static void hdmi_msm_hpd_state_work(struct work_struct *work)
 				kobject_uevent(external_common_state->uevent_kobj,
 					KOBJ_ONLINE);
 #ifdef CONFIG_HTC_HEADSET_MGR
-                                switch_send_event(BIT_HDMI_CABLE, true);
+				switch_send_event(BIT_HDMI_CABLE, true);
 #endif
 
+#ifdef HONEYCOMB_HDMI
+				switch_set_state(&hdmi_msm_state->hpd_switch, 1);
+#endif
 
 				#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT
 				hr_msleep(100);
 				hdmi_msm_hdcp_enable();
-#endif
+				#endif
 			}
 		} else {
 			DEV_INFO("HDMI HPD: sense DISCONNECTED: send OFFLINE\n");
@@ -383,10 +390,12 @@ static void hdmi_msm_hpd_state_work(struct work_struct *work)
 			kobject_uevent(external_common_state->uevent_kobj,
 				KOBJ_OFFLINE);
 #ifdef CONFIG_HTC_HEADSET_MGR
-		                switch_send_event(BIT_HDMI_CABLE, false);
+			switch_send_event(BIT_HDMI_CABLE, false);
 #endif
 
-
+#ifdef HONEYCOMB_HDMI
+			switch_set_state(&hdmi_msm_state->hpd_switch, 0);
+#endif
 		}
 	}
 
@@ -475,11 +484,11 @@ static irqreturn_t hdmi_msm_isr(int irq, void *dev_id)
 	uint32 audio_int_val;
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT
 	uint32 hdcp_int_val;
+        char *envp[2];
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
 	static uint32 fifo_urun_int_occurred;
 	static uint32 sample_drop_int_occurred;
 	const uint32 occurrence_limit = 5;
-        char *envp[2];
 
 	if (!hdmi_msm_state || !hdmi_msm_state->hpd_initialized || !HDMI_BASE) {
 		DEV_DBG("ISR ignored, probe failed\n");
@@ -1738,20 +1747,20 @@ static int hdcp_authentication_part1(void)
 
 	msm_hdmi_init_ddc();
 
-                /* Read Bksv 5 bytes at 0x00 in HDCP port */
-                ret = hdmi_msm_ddc_read(0x74, 0x00, bksv, 5, 5, "Bksv",TRUE);
-                if (ret) {
-                        DEV_ERR("%s(%d): Read BKSV failed", __func__, __LINE__);
-                        goto error;
-                }
-                /* check there are 20 ones in BKSV */
-                if (hdmi_msm_count_one(bksv, 5) != 20) {
-                        DEV_ERR("HDCP: BKSV read from Sink doesn't have 20 1's and 20 "
-                                "0's, FAIL (BKSV=%02x%02x%02x%02x%02x)\n",
-                                        bksv[4], bksv[3], bksv[2], bksv[1], bksv[0]);
-                        ret = -EINVAL;
-                        goto error;
-                }
+	/* Read Bksv 5 bytes at 0x00 in HDCP port */
+	ret = hdmi_msm_ddc_read(0x74, 0x00, bksv, 5, 5, "Bksv",TRUE);
+	if (ret) {
+		DEV_ERR("%s(%d): Read BKSV failed", __func__, __LINE__);
+		goto error;
+	}
+	/* check there are 20 ones in BKSV */
+	if (hdmi_msm_count_one(bksv, 5) != 20) {
+		DEV_ERR("HDCP: BKSV read from Sink doesn't have 20 1's and 20 "
+				"0's, FAIL (BKSV=%02x%02x%02x%02x%02x)\n",
+				bksv[4], bksv[3], bksv[2], bksv[1], bksv[0]);
+		ret = -EINVAL;
+		goto error;
+	}
 
 	link0_bksv_0 = bksv[3];
 	link0_bksv_0 = (link0_bksv_0 << 8) | bksv[2];
@@ -1763,10 +1772,10 @@ static int hdcp_authentication_part1(void)
 	/* read Bcaps at 0x40 in HDCP Port */
 	ret = hdmi_msm_ddc_read(0x74, 0x40, &bcaps, 1, 5, "Bcaps",TRUE);
 	if (ret) {
-                DEV_ERR("%s(%d): Read Bcaps failed", __func__, __LINE__);
-                goto error;
-        }
-        DEV_DBG("HDCP: Bcaps=%02x\n", bcaps);
+		DEV_ERR("%s(%d): Read Bcaps failed", __func__, __LINE__);
+		goto error;
+	}
+	DEV_DBG("HDCP: Bcaps=%02x\n", bcaps);
 
 	/* HDCP setup prior to HDCP enabled */
 
@@ -3722,6 +3731,7 @@ static int __devexit hdmi_msm_remove(struct platform_device *pdev)
 
 	DEV_INFO("HDMI HPD: OFF\n");
 	hdmi_msm_hpd_off();
+
 	free_irq(hdmi_msm_state->irq, NULL);
 
 	if (hdmi_msm_state->qfprom_io)
@@ -3733,6 +3743,9 @@ static int __devexit hdmi_msm_remove(struct platform_device *pdev)
 	hdmi_msm_state->hdmi_io = NULL;
 
 	external_common_state_remove();
+#ifdef HONEYCOMB_HDMI
+	switch_dev_unregister(&hdmi_msm_state->hpd_switch);
+#endif
 
 	if (hdmi_msm_state->hdmi_app_clk)
 		clk_put(hdmi_msm_state->hdmi_app_clk);
@@ -3889,6 +3902,11 @@ static int __init hdmi_msm_init(void)
 	INIT_WORK(&hdmi_msm_state->hdcp_reauth_work, hdmi_msm_hdcp_reauth_work);
 	INIT_WORK(&hdmi_msm_state->hdcp_work, hdmi_msm_hdcp_work);
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
+
+#ifdef HONEYCOMB_HDMI
+	hdmi_msm_state->hpd_switch.name = "hdmi";
+	switch_dev_register(&hdmi_msm_state->hpd_switch);
+#endif
 
 	rc = platform_device_register(&this_device);
 	if (rc) {

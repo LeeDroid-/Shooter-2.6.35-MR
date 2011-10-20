@@ -25,6 +25,8 @@
 #include <linux/pm_runtime.h>
 #include <mach/msm_rpcrouter-8x60.h>
 #include <asm/atomic.h>
+#include <linux/delay.h>
+#include <linux/kthread.h>
 
 #define PM8058_RTC_CTRL		0x1E8
 	#define PM8058_RTC_ENABLE	BIT(7)
@@ -62,6 +64,9 @@ struct rpc_time_julian {
 
 static struct msm_rpc_endpoint *ep;
 static struct mutex rpc_setup_lock;
+#ifdef CONFIG_MACH_HOLIDAY
+int rtc_debug_flag = 0;
+#endif
 
 static int
 pm8058_rtc_read_bytes(struct pm8058_rtc *rtc_dd, u8 *rtc_val, int base)
@@ -147,16 +152,44 @@ pm8058_rtc_connect_to_mdm(struct rtc_time *tm)
 	req.time.second = cpu_to_be32(tm->tm_sec);
 	req.time.day_of_week = cpu_to_be32(tm->tm_wday);
 
+	//#ifdef CONFIG_MACH_HOLIDAY
+	#if 0 //disable debug flag
+	rtc_debug_flag = 1;
+	if (rtc_debug_flag) printk("[RTC] RTC debug start..\n");
+	#endif
 	ret = msm_rpc_call_reply(ep, TIMEREMOTE_PROCEEDURE_SET_JULIAN,
 			&req, sizeof(req),
 			&rep, sizeof(rep),
 			5 * HZ);
-	if (ret < 0)
+	if (ret < 0) {
 		pr_err("%s: set time fail, ret = %d\n", __func__, ret);
+		// #ifdef CONFIG_MACH_HOLIDAY
+		#if 0 //disable debug panic
+		panic("RPC link fail, FAKE a kernel panic for ramdump!!\n"); /* HTC test */
+		#endif
+	} else
+		pr_info("%s: set time to modem successfully\n", __func__);
+
+	#ifdef CONFIG_MACH_HOLIDAY
+	if (rtc_debug_flag) printk("[RTC] RTC debug stop..\n");
+	rtc_debug_flag = 0;
+	#endif
 
 	return 0;
 }
 
+/*
+ * In order to prevent blocking in RPC functions, do pm8058_rtc_connect_to_mdm() in another thread.
+ */
+static int rtc_connect_to_mdm(void * arg)
+{
+	struct rtc_time *tm;
+
+	tm = (struct rtc_time *)arg;
+	pm8058_rtc_connect_to_mdm(tm);
+	kfree(tm);
+	return 0;
+}
 /*
  * Steps to write the RTC registers.
  * 1. Disable alarm if enabled.
@@ -172,6 +205,7 @@ pm8058_rtc0_set_time(struct device *dev, struct rtc_time *tm)
 	unsigned long secs = 0;
 	u8 value[4], reg = 0, alarm_enabled = 0, ctrl_reg = 0, i;
 	struct pm8058_rtc *rtc_dd = dev_get_drvdata(dev);
+	struct rtc_time * rtc_t;
 
 
 	rtc_tm_to_time(tm, &secs);
@@ -226,7 +260,9 @@ pm8058_rtc0_set_time(struct device *dev, struct rtc_time *tm)
 		return rc;
 	}
 
-	pm8058_rtc_connect_to_mdm(tm);
+	rtc_t = kmalloc(sizeof(struct rtc_time),GFP_KERNEL);
+	memcpy(rtc_t, tm, sizeof(struct rtc_time));
+	kthread_run(rtc_connect_to_mdm, rtc_t, "update_rtc_to_8kmodem");
 
 	if (alarm_enabled) {
 		ctrl_reg |= PM8058_RTC_ALARM_ENABLE;
@@ -447,6 +483,34 @@ static irqreturn_t pm8058_alarm_trigger(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static ssize_t pm8058_rtc_sync_time_to_mdm(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int input;
+	struct rtc_time tm;
+
+	sscanf(buf, "%d", &input);
+
+	if (input == 1) {
+		pm8058_rtc0_read_time(dev, &tm);
+		pm8058_rtc_connect_to_mdm(&tm);
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(sync_time, S_IRUSR | S_IWUSR , NULL, pm8058_rtc_sync_time_to_mdm);
+
+static struct attribute *pm8058_rtc_attrs[] = {
+	&dev_attr_sync_time.attr,
+	NULL
+};
+
+static const struct attribute_group pm8058_rtc_sysfs_files = {
+	.attrs	= pm8058_rtc_attrs,
+};
+
 static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 {
 	int rc;
@@ -526,6 +590,10 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 	device_init_wakeup(&pdev->dev, 1);
 
 	pr_debug("%s: Probe success !!\n", __func__);
+
+	rc = sysfs_create_group(&pdev->dev.kobj, &pm8058_rtc_sysfs_files);
+	if (rc)
+		pr_err("%s: Sysfs group creation failed (%d)\n", __func__, rc);
 
 	return 0;
 

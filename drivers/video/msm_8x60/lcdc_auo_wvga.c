@@ -22,6 +22,8 @@
 #include <linux/spi/spi.h>
 #include <linux/delay.h>
 
+#define DEFAULT_BRIGHTNESS	143
+
 #define LCDC_SHARP_SPI_DEVICE_NAME	"spi_panel"
 struct mutex lock;
 struct spi_device *lcdc_spi_client;
@@ -469,12 +471,47 @@ static int lcdc_auo_panel_off(struct platform_device *pdev)
 
 static void lcdc_auo_panel_set_backlight(struct msm_fb_data_type *mfd)
 {
-	int bl_level;
-	pr_info("%s+:bl=%d\n", __func__, mfd->bl_level);
+	int bl_level = mfd->bl_level;
 
-	bl_level = mfd->bl_level;
+	if ((bl_level & 0xf)==0)
+		pr_info("wvga %s:bl=%d\n", __func__, bl_level);
+
 	if (dd->pdata && dd->pdata->pmic_backlight && dd->pdata->shrink_pwm)
 		dd->pdata->pmic_backlight(dd->pdata->shrink_pwm(mfd->bl_level));
+}
+
+
+static int bl_level_prevset = 1;
+static void lcdc_auo_panel_bkl_switch(struct msm_fb_data_type *mfd, bool on)
+{
+	unsigned int val = 0;
+
+	pr_info("lcdc_auo_panel_bkl_switch, on=%d\n", on);
+	if(on) {
+		val = mfd->bl_level;
+		if(val == 0) {
+			if(bl_level_prevset != 1) {
+				val = bl_level_prevset;
+				mfd->bl_level = val;
+		} else {
+			val = DEFAULT_BRIGHTNESS;
+			mfd->bl_level = val;
+		}
+	}
+	lcdc_auo_panel_set_backlight(mfd);
+	} else {
+		mfd->bl_level = 0;
+		lcdc_auo_panel_set_backlight(mfd);
+	}
+
+	return;
+}
+
+static void lcdc_auo_panel_bkl_ctrl(bool on)
+{
+	pr_info("lcdc_auo_panel_bkl_ctrl, on=%d\n", on);
+
+	return;
 }
 
 static ssize_t show_vga_enable(struct device *device,
@@ -590,6 +627,8 @@ static struct msm_fb_panel_data auo_panel_data = {
 	.on = lcdc_auo_panel_on,
 	.off = lcdc_auo_panel_off,
 	.set_backlight = lcdc_auo_panel_set_backlight,
+	.bklswitch	= lcdc_auo_panel_bkl_switch,
+	.bklctrl	= lcdc_auo_panel_bkl_ctrl,
 };
 
 static struct platform_device this_device = {

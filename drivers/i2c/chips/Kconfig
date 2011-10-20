@@ -44,6 +44,12 @@ config SENSORS_AKM8975
         help
          AKM8975 Compass Driver implemented by HTC.
 
+config SENSORS_AKM8975_PANA_GYRO
+        tristate "AKM8973 Compass Driver for Pana Gyro"
+        depends on I2C
+        help
+         AKM8975 Compass Driver implemented by HTC.
+
 config SENSORS_CAPSENSE
 	tristate "CapSense Driver"
 	depends on I2C
@@ -85,6 +91,12 @@ config SENSORS_BMA250
 	depends on I2C=y
 	help
 	  BMA250 G-sensor Driver implemented by HTC.
+
+config SENSORS_PANASONIC_GYRO
+	tristate "PANASONIC GYRO sensor support"
+	depends on I2C=y
+	help
+	  PANASONIC GYR Driver implemented by HTC.
 
 config SENSORS_NFC_PN544
 	tristate "PN544 NFC sensor support"
@@ -168,6 +180,12 @@ config INPUT_CAPELLA_CM3628
 	tristate "CM3628 proximity and light sensor"
 	help
 	  Say Y here to enable the CM3628 Short Distance Proximity
+	  Sensor with Ambient Light Sensor.
+
+config INPUT_CAPELLA_CM3629
+	tristate "CM3629 proximity and light sensor"
+	help
+	  Say Y here to enable the CM3629 Short Distance Proximity
 	  Sensor with Ambient Light Sensor.
 
 endmenu

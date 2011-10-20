@@ -427,7 +427,6 @@ static int pm8058_led_probe(struct platform_device *pdev)
 	ret = -ENOMEM;
 
 	pdata = pdev->dev.platform_data;
-
 	if (pdata == NULL) {
 		pr_err("%s: platform data is NULL\n", __func__);
 		return -ENODEV;

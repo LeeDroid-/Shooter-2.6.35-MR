@@ -53,7 +53,6 @@ static atomic_t start_counting;
 static atomic_t snapshot_flag;
 static atomic_t preview_flag;
 
-
 struct sp3d_spi_ctrl_blk {
 	struct spi_device *spi;
 	spinlock_t		spinlock;
@@ -328,6 +327,7 @@ static int32_t sp3d_spi_write_table(struct sp3d_reg_conf const
     }
     spi_message_init(&m);
     memset(&tx_addr, 0, sizeof(struct spi_transfer));
+
     for (i = 0; i < num; i++) {
         sp3d_spi_write_addr[i*8] = SP3D_REGADDR_WR;
         sp3d_spi_write_addr[i*8+1] = (reg_conf_tbl->waddr & 0xff00) >> 8;
@@ -964,6 +964,8 @@ int sp3d_init_setting_thread(void){
 	return rc;
 }
 
+
+
 static irqreturn_t sp3d_irq_handler(int irq, void *dev_id){
 	unsigned long flags;
 	smp_mb();
@@ -1233,7 +1235,6 @@ static int32_t sp3d_preview_config(int mode)
 	rc = sp3d_sensor_setting(UPDATE_PERIODIC, rt);
 	if (SP3D_CHECK_SPI(rc) < 0)
 		return rc;
-
 	sp3d_ctrl->curr_res = sp3d_ctrl->prev_res;
 	sp3d_ctrl->sensormode = mode;
 	return rc;
@@ -1406,6 +1407,7 @@ int sp3d_spi_open_init(struct msm_camera_sensor_info *data)
 	}
 
 	rc = sp3d_sensor_setting(REG_INIT, RES_PREVIEW);
+
 	if (rc < 0)
 		goto init_fail;
 	else
@@ -1506,7 +1508,7 @@ faile:
 
 static int sp3d_set_effect(int8_t effect_type)
 {
-	int rc = 0;
+	int rc=0;
 	if(atomic_read(&snapshot_flag) || !atomic_read(&preview_flag))
 		return rc;
 	sp3d_wait_INT(1);
@@ -1882,7 +1884,7 @@ static int sp3d_set_af_mode( enum sensor_af_mode af_mode_value)
 
 static int  sp3d_set_af_area(int af_area){
 	uint16_t area = 0;
-	int16_t rc = 0;		/* HTC Glenn 20110721 for klockwork issue */
+	int16_t rc = 0;
 	if(atomic_read(&snapshot_flag) || !atomic_read(&preview_flag))
 		return rc;
 	sp3d_wait_INT(1);

@@ -1578,14 +1578,15 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 			rc = -EINVAL;
 			goto proc_general_done;
 		}
+
 		cmdp = kmalloc(V31_OPERATION_CFG_LEN, GFP_ATOMIC);
-		/* HTC_START Glenn 20110721 For klockwork issue */
+
 		if (!cmdp) {
 			pr_err("%s: cmdp allocation failed.\n", __func__);
 			rc = -ENOMEM;
 			goto proc_general_done;
 		}
-		/* HTC_END */
+
 		if (copy_from_user(cmdp,
 			(void __user *)(cmd->value),
 			V31_OPERATION_CFG_LEN)) {

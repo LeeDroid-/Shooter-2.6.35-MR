@@ -699,13 +699,12 @@ static int __msm_get_frame(struct msm_sync *sync,
 
 	vdata = (struct msm_vfe_resp *)(qcmd->command);
 	pphy = &vdata->phy;
-	/* HTC_START Glenn 20110721 For klockwork issue */
+
 	if (!pphy) {
-		rc = -EFAULT;
 		pr_err("%s: Avoid accessing NULL pointer!\n", __func__);
 		goto err;
 	}
-	/* HTC_END */
+
 	rc = msm_pmem_frame_ptov_lookup(sync,
 			pphy->y_phy,
 			pphy->cbcr_phy,
@@ -1105,10 +1104,10 @@ static int msm_divert_st_frame(struct msm_sync *sync,
 	struct msm_st_frame buf;
 	struct video_crop_t *crop = NULL;
 	int rc = 0;
-	/* HTC_START Glenn 20110721 For klockwork issue */
+
 	memset(&pinfo, 0x00, sizeof(struct msm_pmem_info));
 	memset(&buf, 0x00, sizeof(struct msm_st_frame));
-	/* HTC_END */
+
 	if (se->stats_event.msg_id == OUTPUT_TYPE_ST_L) {
 		buf.type = OUTPUT_TYPE_ST_L;
 	} else if (se->stats_event.msg_id == OUTPUT_TYPE_ST_R) {
@@ -1712,7 +1711,6 @@ static int msm_frame_axi_cfg(struct msm_sync *sync,
 	int rc = -EIO;
 	struct axidata axi_data;
 	void *data = &axi_data;
-	/* HTC Glenn 20110721 For klockwork issue */
 	struct msm_pmem_region region[MAX_PMEM_CFG_BUFFERS + 1];
 	int pmem_type;
 
@@ -2360,12 +2358,12 @@ static int msm_error_config(struct msm_sync *sync, void __user *arg)
 {
 	struct msm_queue_cmd *qcmd =
 		kmalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
-	/* HTC_START Glenn 20110721 For klockwork issue */
+
 	if (!qcmd) {
 		pr_info("%s: kmalloc for qcmd failed.\n", __func__);
 		return -EFAULT;
 	}
-	/* HTC_END */
+
 	qcmd->command = NULL;
 
 	if (qcmd)

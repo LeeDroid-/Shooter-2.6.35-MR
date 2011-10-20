@@ -23,60 +23,60 @@
 
 #include <mach/htc_sleep_clk.h>
 
-#include "board-shooter.h"
+#include "board-shooter_u.h"
 
 static struct rfkill *bt_rfk;
 static const char bt_name[] = "bcm4329";
 
 /* bt on configuration */
-static uint32_t shooter_bt_on_table[] = {
+static uint32_t shooter_u_bt_on_table[] = {
 
 	/* BT_RTS */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_RTS,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_RTS,
 				1,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_CTS */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_CTS,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_CTS,
 				1,
 				GPIO_CFG_INPUT,
-				GPIO_CFG_PULL_UP,
+				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_RX */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_RX,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_RX,
 				1,
 				GPIO_CFG_INPUT,
-				GPIO_CFG_PULL_UP,
+				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_TX */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_TX,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_TX,
 				1,
 				GPIO_CFG_OUTPUT,
-				GPIO_CFG_NO_PULL,
+				GPIO_CFG_PULL_UP,
 				GPIO_CFG_2MA),
 
 	/* BT_HOST_WAKE */
-	GPIO_CFG(SHOOTER_GPIO_BT_HOST_WAKE,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_HOST_WAKE,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_CHIP_WAKE */
-	GPIO_CFG(SHOOTER_GPIO_BT_CHIP_WAKE,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_CHIP_WAKE,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 
 	/* BT_RESET_N */
-	GPIO_CFG(SHOOTER_GPIO_BT_RESET_N,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_RESET_N,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_SHUTDOWN_N */
-	GPIO_CFG(SHOOTER_GPIO_BT_SHUTDOWN_N,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_SHUTDOWN_N,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
@@ -84,54 +84,54 @@ static uint32_t shooter_bt_on_table[] = {
 };
 
 /* bt off configuration */
-static uint32_t shooter_bt_off_table[] = {
+static uint32_t shooter_u_bt_off_table[] = {
 
 	/* BT_RTS */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_RTS,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_RTS,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_CTS */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_CTS,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_CTS,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_2MA),
 	/* BT_RX */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_RX,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_RX,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_2MA),
 	/* BT_TX */
-	GPIO_CFG(SHOOTER_GPIO_BT_UART1_TX,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_UART1_TX,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 
 	/* BT_RESET_N */
-	GPIO_CFG(SHOOTER_GPIO_BT_RESET_N,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_RESET_N,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 	/* BT_SHUTDOWN_N */
-	GPIO_CFG(SHOOTER_GPIO_BT_SHUTDOWN_N,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_SHUTDOWN_N,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_2MA),
 
 	/* BT_HOST_WAKE */
-	GPIO_CFG(SHOOTER_GPIO_BT_HOST_WAKE,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_HOST_WAKE,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_2MA),
 	/* BT_CHIP_WAKE */
-	GPIO_CFG(SHOOTER_GPIO_BT_CHIP_WAKE,
+	GPIO_CFG(SHOOTER_U_GPIO_BT_CHIP_WAKE,
 				0,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
@@ -151,45 +151,55 @@ static void config_bt_table(uint32_t *table, int len)
 	}
 }
 
-static void shooter_config_bt_on(void)
+static void shooter_u_config_bt_on(void)
 {
+	printk(KERN_INFO "[BT]-- R ON --\n");
+
 	/* set bt on configuration*/
-	config_bt_table(shooter_bt_on_table,
-				ARRAY_SIZE(shooter_bt_on_table));
+	config_bt_table(shooter_u_bt_on_table,
+				ARRAY_SIZE(shooter_u_bt_on_table));
 	mdelay(2);
 
+	/* BT_RESET_N */
+	gpio_set_value(SHOOTER_U_GPIO_BT_RESET_N, 0);
+	mdelay(1);
+
 	/* BT_SHUTDOWN_N */
-	gpio_set_value(SHOOTER_GPIO_BT_SHUTDOWN_N, 1);
+	gpio_set_value(SHOOTER_U_GPIO_BT_SHUTDOWN_N, 0);
+	mdelay(5);
+
+	/* BT_SHUTDOWN_N */
+	gpio_set_value(SHOOTER_U_GPIO_BT_SHUTDOWN_N, 1);
 	mdelay(1);
 
 	/* BT_RESET_N */
-	gpio_set_value(SHOOTER_GPIO_BT_RESET_N, 1);
-	mdelay(1);
+	gpio_set_value(SHOOTER_U_GPIO_BT_RESET_N, 1);
+	mdelay(2);
 
 }
 
-static void shooter_config_bt_off(void)
+static void shooter_u_config_bt_off(void)
 {
 	/* BT_RESET_N */
-	gpio_set_value(SHOOTER_GPIO_BT_RESET_N, 0);
+	gpio_set_value(SHOOTER_U_GPIO_BT_RESET_N, 0);
 	mdelay(1);
 
 	/* BT_SHUTDOWN_N */
-	gpio_set_value(SHOOTER_GPIO_BT_SHUTDOWN_N, 0);
+	gpio_set_value(SHOOTER_U_GPIO_BT_SHUTDOWN_N, 0);
 	mdelay(1);
 
 	/* set bt off configuration*/
-	config_bt_table(shooter_bt_off_table,
-				ARRAY_SIZE(shooter_bt_off_table));
+	config_bt_table(shooter_u_bt_off_table,
+				ARRAY_SIZE(shooter_u_bt_off_table));
 	mdelay(2);
 
 	/* BT_RTS */
-	gpio_set_value(SHOOTER_GPIO_BT_UART1_RTS, 0);
+	gpio_set_value(SHOOTER_U_GPIO_BT_UART1_RTS, 0);
 
 	/* BT_CTS */
 
 	/* BT_TX */
-	gpio_set_value(SHOOTER_GPIO_BT_UART1_TX, 0);
+	gpio_set_value(SHOOTER_U_GPIO_BT_UART1_TX, 0);
 
 	/* BT_RX */
 
@@ -197,32 +207,34 @@ static void shooter_config_bt_off(void)
 	/* BT_HOST_WAKE */
 
 	/* BT_CHIP_WAKE */
-	gpio_set_value(SHOOTER_GPIO_BT_CHIP_WAKE, 0);
+	gpio_set_value(SHOOTER_U_GPIO_BT_CHIP_WAKE, 0);
+
+	printk(KERN_INFO "[BT]-- R OFF --\n");
 }
 
 static int bluetooth_set_power(void *data, bool blocked)
 {
 	if (!blocked)
-		shooter_config_bt_on();
+		shooter_u_config_bt_on();
 	else
-		shooter_config_bt_off();
+		shooter_u_config_bt_off();
 
 	return 0;
 }
 
-static struct rfkill_ops shooter_rfkill_ops = {
+static struct rfkill_ops shooter_u_rfkill_ops = {
 	.set_block = bluetooth_set_power,
 };
 
-static int shooter_rfkill_probe(struct platform_device *pdev)
+static int shooter_u_rfkill_probe(struct platform_device *pdev)
 {
 	int rc = 0;
 	bool default_state = true;  /* off */
 
-	rc = gpio_request(SHOOTER_GPIO_BT_RESET_N, "bt_reset");
+	rc = gpio_request(SHOOTER_U_GPIO_BT_RESET_N, "bt_reset");
 	if (rc)
 		goto err_gpio_reset;
-	rc = gpio_request(SHOOTER_GPIO_BT_SHUTDOWN_N, "bt_shutdown");
+	rc = gpio_request(SHOOTER_U_GPIO_BT_SHUTDOWN_N, "bt_shutdown");
 	if (rc)
 		goto err_gpio_shutdown;
 
@@ -233,7 +245,7 @@ static int shooter_rfkill_probe(struct platform_device *pdev)
 	bluetooth_set_power(NULL, default_state);
 
 	bt_rfk = rfkill_alloc(bt_name, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
-				&shooter_rfkill_ops, NULL);
+				&shooter_u_rfkill_ops, NULL);
 	if (!bt_rfk) {
 		rc = -ENOMEM;
 		goto err_rfkill_alloc;
@@ -252,47 +264,47 @@ static int shooter_rfkill_probe(struct platform_device *pdev)
 err_rfkill_reg:
 	rfkill_destroy(bt_rfk);
 err_rfkill_alloc:
-	gpio_free(SHOOTER_GPIO_BT_SHUTDOWN_N);
+	gpio_free(SHOOTER_U_GPIO_BT_SHUTDOWN_N);
 err_gpio_shutdown:
-	gpio_free(SHOOTER_GPIO_BT_RESET_N);
+	gpio_free(SHOOTER_U_GPIO_BT_RESET_N);
 err_gpio_reset:
 	return rc;
 }
 
-static int shooter_rfkill_remove(struct platform_device *dev)
+static int shooter_u_rfkill_remove(struct platform_device *dev)
 {
 	rfkill_unregister(bt_rfk);
 	rfkill_destroy(bt_rfk);
-	gpio_free(SHOOTER_GPIO_BT_SHUTDOWN_N);
-	gpio_free(SHOOTER_GPIO_BT_RESET_N);
+	gpio_free(SHOOTER_U_GPIO_BT_SHUTDOWN_N);
+	gpio_free(SHOOTER_U_GPIO_BT_RESET_N);
 
 	return 0;
 }
 
-static struct platform_driver shooter_rfkill_driver = {
-	.probe = shooter_rfkill_probe,
-	.remove = shooter_rfkill_remove,
+static struct platform_driver shooter_u_rfkill_driver = {
+	.probe = shooter_u_rfkill_probe,
+	.remove = shooter_u_rfkill_remove,
 	.driver = {
-		.name = "shooter_rfkill",
+		.name = "shooter_u_rfkill",
 		.owner = THIS_MODULE,
 	},
 };
 
-static int __init shooter_rfkill_init(void)
+static int __init shooter_u_rfkill_init(void)
 {
-	if (!machine_is_shooter())
+	if (!machine_is_shooter_u())
 		return 0;
 
-	return platform_driver_register(&shooter_rfkill_driver);
+	return platform_driver_register(&shooter_u_rfkill_driver);
 }
 
-static void __exit shooter_rfkill_exit(void)
+static void __exit shooter_u_rfkill_exit(void)
 {
-	platform_driver_unregister(&shooter_rfkill_driver);
+	platform_driver_unregister(&shooter_u_rfkill_driver);
 }
 
-module_init(shooter_rfkill_init);
-module_exit(shooter_rfkill_exit);
-MODULE_DESCRIPTION("shooter rfkill");
+module_init(shooter_u_rfkill_init);
+module_exit(shooter_u_rfkill_exit);
+MODULE_DESCRIPTION("shooter_u rfkill");
 MODULE_AUTHOR("Nick Pelly <npelly@google.com>");
 MODULE_LICENSE("GPL");

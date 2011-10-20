@@ -119,10 +119,10 @@ static int qs_s5k4e1_vreg_enable(const struct msm_camera_sensor_info *sdata)
 {
 	int rc;
 
-	pr_err("%s camera vreg on\n", __func__);
+	pr_info("%s camera vreg on\n", __func__);
 
 	if (sdata->camera_power_on == NULL) {
-		pr_err("sensor platform_data didnt register\n");
+		pr_err("sensor platform_data didn't register\n");
 		return -EIO;
 	}
 	rc = sdata->camera_power_on();
@@ -1605,9 +1605,9 @@ int qs_s5k4e1_sensor_open_init(struct msm_camera_sensor_info *data)
 	if (!rc) {
 		pr_info("sensor_reset = %d\n", rc);
 		gpio_direction_output(data->sensor_reset, 0);
-		mdelay(12);
+		mdelay(15);
 		gpio_set_value_cansleep(data->sensor_reset, 1);
-		mdelay(10);
+		mdelay(12);
 	} else {
 		goto init_fail;
 	}

@@ -1700,8 +1700,10 @@ int mdp4_overlay_3d(struct fb_info *info, struct msmfb_overlay_3d *req)
 		if(req->is_3d) {
 			init_completion(&ov_comp);
 			atomic_set(&ov_unset, 0);
-		} else
+		} else {
+			//check dmap status before try to switch virtual fb back to normal fb
 			mdp4_dsi_blt_dmap_busy_wait(mfd);
+		}
 
 		mdp4_dsi_cmd_3d(mfd, req);
 		virtualfb3d = *req;
@@ -1858,6 +1860,7 @@ static uint32 mdp4_overlay_get_perf_level(uint32 width, uint32 height,
 	else
 		return OVERLAY_PERF_LEVEL1;
 }
+
 void mdp4_dump_ov(struct mdp_overlay *ov);
 int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 {
@@ -2047,7 +2050,6 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 	}
 #endif
 
-
 	mdp4_stat.overlay_unset[pipe->mixer_num]++;
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 	if (pipe->mixer_num == MDP4_MIXER0) {
@@ -2058,7 +2060,6 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 		}
 	}
 #endif
-
 	mdp4_overlay_pipe_free(pipe);
 
 	//mdp4_del_res_rel = 1;

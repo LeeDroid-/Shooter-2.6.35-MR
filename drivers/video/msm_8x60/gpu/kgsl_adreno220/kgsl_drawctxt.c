@@ -1583,6 +1583,7 @@ int kgsl_drawctxt_destroy(struct kgsl_device *device,
 				     CTXT_FLAGS_SHADER_SAVE |
 				     CTXT_FLAGS_GMEM_SHADOW |
 				     CTXT_FLAGS_STATE_SHADOW);
+
 		kgsl_drawctxt_switch(yamato_device, NULL, 0);
 	}
 

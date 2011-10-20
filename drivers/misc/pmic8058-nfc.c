@@ -149,7 +149,7 @@ EXPORT_SYMBOL(pm8058_nfc_config);
 int pm8058_nfc_get_status(struct pm8058_nfc_device *nfcdev,
 			  u32 mask, u32 *status)
 {
-	u8	nfc_ctrl, nfc_test;
+	u8	nfc_ctrl = 0, nfc_test = 0;
 	u32	st;
 	int	rc;
 

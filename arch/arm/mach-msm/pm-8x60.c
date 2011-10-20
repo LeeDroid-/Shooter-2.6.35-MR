@@ -681,8 +681,7 @@ static void msm_pm_spm_power_collapse(
 		msm_watchdog_suspend();
 #endif
 
-		printk(KERN_INFO "Entering cpu0 suspend pc TZ Enter cpu0=%u, TZ Exit cp0=%u, TZ Enter cpu1=%u TZ Enter cpu1=%u msm_pm_exit_0=%u msm_pm_exit_1=%u TZ progress=%d TZ KA=%x TZERR=%x\n",
-		       *tz_entry_0, *tz_exit_0, *tz_entry_1, *tz_exit_1, *msm_kernel_exit_0, *msm_kernel_exit_1, *tz_progress, *tz_kernel_addr, *tz_error);
+		printk("entering cpu0 suspend pc TZ Enter cpu0=%u, TZ Exit cp0=%u, TZ Enter cpu1=%u TZ Enter cpu1=%u msm_pm_exit_0=%u msm_pm_exit_1=%u  TZ progress=%d TZ KA=%x TZERR=%x\n", *tz_entry_0, *tz_exit_0, *tz_entry_1, *tz_exit_1, *msm_kernel_exit_0, *msm_kernel_exit_1, *tz_progress, *tz_kernel_addr, *tz_error);
 		*cpu1_pen_rejection = 0;
 		printk(KERN_INFO "[R] suspend end\n");
 	}
@@ -1162,8 +1161,7 @@ enter_exit:
 	if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
 		pr_info("%s: return\n", __func__);
 
-	printk(KERN_INFO "Suspend Exit TZ Enter cpu0=%u, TZ Exit cp0=%u, TZ Enter cpu1=%u TZ Enter cpu1=%u msm_pm_exit_0=%u msm_pm_exit_1=%u TZ progress=%d TZ KA=%x TZERR=%x pen_rejection=%d\n",
-	       *tz_entry_0, *tz_exit_0, *tz_entry_1, *tz_exit_1, *msm_kernel_exit_0, *msm_kernel_exit_1, *tz_progress, *tz_kernel_addr, *tz_error, *cpu1_pen_rejection);
+	printk("Suspend Exit TZ Enter cpu0=%u, TZ Exit cp0=%u, TZ Enter cpu1=%u TZ Enter cpu1=%u msm_pm_exit_0=%u msm_pm_exit_1=%u  TZ progress=%d TZ KA=%x TZERR=%x pen_rejection=%d\n", *tz_entry_0, *tz_exit_0, *tz_entry_1, *tz_exit_1, *msm_kernel_exit_0, *msm_kernel_exit_1, *tz_progress, *tz_kernel_addr, *tz_error, *cpu1_pen_rejection);
 	return 0;
 }
 

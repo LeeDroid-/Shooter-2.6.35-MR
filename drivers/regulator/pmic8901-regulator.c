@@ -978,7 +978,7 @@ static int pm8901_init_vs(struct pm8901_chip *chip, struct pm8901_vreg *vreg)
 static int pm8901_init_regulator(struct pm8901_chip *chip,
 		struct pm8901_vreg *vreg)
 {
-	int rc;
+	int rc = 0;
 
 	/* Store current regulator register values. */
 	if (vreg->type != REGULATOR_TYPE_MPP) {

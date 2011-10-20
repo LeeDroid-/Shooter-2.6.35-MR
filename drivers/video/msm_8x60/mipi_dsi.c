@@ -572,7 +572,10 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	mipi_dsi_host_init(mipi);
 
 	//workaround for orise driver ic to exit ULP mode
-	if( bfirsttime && ( (panel_type  == PANEL_ID_SHR_SHARP_OTM_C2) || (panel_type  == PANEL_ID_RIR_AUO_OTM_C2) ) ) {
+	if( bfirsttime &&
+		( (panel_type == PANEL_ID_SHR_SHARP_OTM_C2) ||
+		  (panel_type == PANEL_ID_RIR_AUO_OTM_C2)   ||
+		  (panel_type == PANEL_ID_HOY_SONY_OTM) ) ) {
 		MIPI_OUTP(MIPI_DSI_BASE + 0x00A8, MIPI_INP(MIPI_DSI_BASE + 0x00A8) | (1<<4)); //enter
 		wmb();
 		MIPI_OUTP(MIPI_DSI_BASE + 0x00A8, MIPI_INP(MIPI_DSI_BASE + 0x00A8) | (1<<12)); //leave

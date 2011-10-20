@@ -56,21 +56,22 @@ static char display_mode_cmd[2] = {0xC2, 0x00}; /* DTYPE_DCS_WRITE */
 
 static char enable_te[2] = {0x35, 0x00};/* DTYPE_DCS_WRITE1 */
 static char himax_cc[2] = {0xCC, 0x08}; /* DTYPE_DCS_WRITE-1 */
-//static char himax_mx_cmd[2] = {0x36, 0x02}; /* DTYPE_DCS_WRITE-1 */
+/* 36h's parameter: [1] 1 -> flip, 0 -> no flip */
+static char himax_mx_normal[2] = {0x36, 0x00}; /* DTYPE_DCS_WRITE-1 */
 
 static char himax_b2[13] = {0xB2, 0x0F, 0xC8, 0x04, 0x0C, 0x04, 0xF4, 0x00,
 							0xFF, 0x04, 0x0C, 0x04, 0x20}; /* DTYPE_DCS_LWRITE */ /*Set display related register */
-static char himax_b4[21] = {0xB4, 0x12, 0x00, 0x05, 0x00, 0x9A, 0x05, 0x06,
+static char himax_b4[21] = {0xB4, 0x00, 0x00, 0x05, 0x00, 0x9A, 0x05, 0x06,
 							0x95, 0x00, 0x01, 0x06, 0x00, 0x08, 0x08, 0x00,
 							0x1D, 0x08, 0x08, 0x08, 0x00}; /* DTYPE_DCS_LWRITE */ /* MPU/Command CYC */
 
-static char himax_d8[21] = {0xD8, 0x12, 0x00, 0x05, 0x00, 0x9A, 0x05, 0x06,
+static char himax_d8[21] = {0xD8, 0x00, 0x00, 0x05, 0x00, 0x9A, 0x05, 0x06,
 							0x95, 0x00, 0x01, 0x06, 0x00, 0x08, 0x08, 0x00,
 							0x1D, 0x08, 0x08, 0x08, 0x00}; /* DTYPE_DCS_LWRITE */ /* MPU/Command CYC */
 static char himax_d4[2] = {0xD4, 0x0C}; /* DTYPE_DCS_WRITE-1 */
 
 static char himax_b1[14] = {0xB1, 0x7C, 0x00, 0x44, 0x76, 0x00, 0x12, 0x12,
-							0x2A, 0x25, 0x1E, 0x1E, 0x42, 0x74}; /* DTYPE_DCS_LWRITE */ /* Set Power */
+							0x2A, 0x25, 0x1E, 0x1E, 0x42, 0x72}; /* DTYPE_DCS_LWRITE */ /* Set Power */
 //static char himax_b6[2] = {0xB6, 0x21}; /* DTYPE_DCS_WRITE-1 */
 
 /* Gamma */
@@ -89,6 +90,9 @@ static char himax_e2[35] = {0xE2, 0x2E, 0x34, 0x33, 0x3A, 0x39, 0x3F, 0x39,
 							0x15, 0x1E, 0x2E, 0x34, 0x33, 0x3A, 0x39, 0x3F,
 							0x39, 0x4E, 0x07, 0x0D, 0x0E, 0x10, 0x15, 0x11,
 							0x15, 0x15, 0x1E};
+
+static char pwm_freq[] = {0xC9, 0x0F, 0x04, 0x1E, 0x1E,
+						  0x00, 0x00, 0x00, 0x10, 0x3E};/* 9.41kHz */
 
 static char led_pwm1[] = {0x51, 0xFF};
 static char led_pwm2[] = {0x53, 0x24};
@@ -131,6 +135,8 @@ static struct dsi_cmd_desc himax_cmd_on_cmds[] = {
 		sizeof(display_mode_cmd), display_mode_cmd},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
 		sizeof(enable_te), enable_te},
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 1,
+		sizeof(himax_mx_normal), himax_mx_normal},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
 		sizeof(himax_cc), himax_cc},
 	{DTYPE_DCS_LWRITE, 1, 0, 0, 10,
@@ -147,6 +153,8 @@ static struct dsi_cmd_desc himax_cmd_on_cmds[] = {
 		sizeof(himax_e1), himax_e1},
 	{DTYPE_DCS_LWRITE, 1, 0, 0, 1,
 		sizeof(himax_e2), himax_e2},
+	{DTYPE_DCS_LWRITE, 1, 0, 0, 1,
+		sizeof(pwm_freq), pwm_freq},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
 		sizeof(led_pwm1), led_pwm1},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
@@ -226,7 +234,6 @@ static int mipi_himax_lcd_on(struct platform_device *pdev)
 	struct mipi_panel_info *mipi;
 //	static int init;
 
-	pr_info("Daniel:%s+++",__func__);
 	mfd = platform_get_drvdata(pdev);
 	if (!mfd)
 		return -ENODEV;
@@ -242,18 +249,17 @@ static int mipi_himax_lcd_on(struct platform_device *pdev)
 	} else
 */      {
 		if (mipi->mode == DSI_VIDEO_MODE) {
-		pr_info("Daniel:DSI_VIDEO_MODE.%s",__func__);
+		pr_info("DSI_VIDEO_MODE.%s",__func__);
 			mipi_dsi_cmds_tx(&himax_tx_buf, himax_video_on_cmds,
 				ARRAY_SIZE(himax_video_on_cmds));
 		} else {
-				pr_info("Daniel:DSI_CMD_MODE.%s",__func__);
+				pr_info("DSI_CMD_MODE.%s",__func__);
 				mipi_dsi_cmds_tx(&himax_tx_buf, himax_cmd_on_cmds,
 				ARRAY_SIZE(himax_cmd_on_cmds));
 				mipi_dsi_cmd_bta_sw_trigger();
 				mipi_himax_manufacture_id();
 			}
 	}
-	pr_info("Daniel:%s---",__func__);
 //end:
 	return 0;
 }
@@ -323,15 +329,12 @@ static void mipi_himax_display_on(struct msm_fb_data_type *mfd)
 
 static int mipi_himax_lcd_probe(struct platform_device *pdev)
 {
-
-	pr_info("Daniel:%s",__func__);
 	if (pdev->id == 0) {
 		mipi_himax_pdata = pdev->dev.platform_data;
 		return 0;
 	}
 
 	msm_fb_add_device(pdev);
-	pr_info("Daniel:%s:end",__func__);
 
 	return 0;
 }
@@ -357,8 +360,6 @@ int mipi_himax_device_register(struct msm_panel_info *pinfo,
 {
 	struct platform_device *pdev = NULL;
 	int ret;
-
-	pr_info("Daniel:%s",__func__);
 
 	if ((channel >= 3) || ch_used[channel])
 		return -ENODEV;
@@ -393,13 +394,10 @@ err_device_put:
 
 static int __init mipi_himax_lcd_init(void)
 {
-
-	pr_info("Daniel:%s",__func__);
 	mipi_dsi_buf_alloc(&himax_tx_buf, DSI_BUF_SIZE);
 	mipi_dsi_buf_alloc(&himax_rx_buf, DSI_BUF_SIZE);
 
 	return platform_driver_register(&this_driver);
-	pr_info("Daniel:%s---",__func__);
 }
 
 module_init(mipi_himax_lcd_init);

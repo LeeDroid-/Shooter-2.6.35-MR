@@ -54,6 +54,7 @@ extern atomic_t ov_unset;
 #define PADDING_ENABLE	2
 #define PADDING_DISABLE	3
 
+
 static __u32 msm_fb_line_length(__u32 fb_index, __u32 xres, int bpp)
 {
 	/* The adreno GPU hardware requires that the pitch be aligned to
@@ -650,6 +651,7 @@ void mdp4_dsi_cmd_overlay_restore(void)
 	if (dsi_mfd && dsi_pipe) {
 		mdp4_dsi_cmd_dma_busy_wait(dsi_mfd, dsi_pipe);
 		mdp4_overlay_update_dsi_cmd(dsi_mfd);
+		//FIXME: check blt_end flag is needed or not
 		if (dsi_pipe->blt_addr && dsi_pipe->blt_end == 0)
 			mdp4_dsi_blt_dmap_busy_wait(dsi_mfd);
 		mdp4_dsi_cmd_overlay_kickoff(dsi_mfd, dsi_pipe);

@@ -146,6 +146,9 @@ static int32_t pm8058_xoadc_arb_cntrl(uint32_t arb_cntrl,
 	if (arb_cntrl) {
 		data_arb_cntrl |= ADC_ARB_USRP_CNTRL_EN_ARB;
 		msm_xo_mode_vote(adc_pmic->adc_voter, MSM_XO_MODE_ON);
+#if defined(CONFIG_MACH_VIGOR)
+		adc_pmic->pdata->xoadc_mpp_config();
+#endif
 	}
 
 	/* Write twice to the CNTRL register for the arbiter settings
@@ -627,20 +630,16 @@ static int32_t pm8058_configure_and_read(uint32_t adc_instance, int32_t channels
 
 	if (!rc) {
 		struct irqaction *act = irq_desc[adc_pmic->adc_irq].action;
+
 		disable_irq(adc_pmic->adc_irq);
-		if (debug_counter/1000) {
-			dump_stack();
-			show_state_filter(TASK_UNINTERRUPTIBLE);
-			print_workqueue();
-			debug_counter = 0;
-		}
-		debug_counter++;
 		pr_err("%s: wait_for_completion_interruptible_timeout\n",
 				__func__);
 		pr_err("%5d: %10u %8x  %s\n", adc_pmic->adc_irq,
 				kstat_irqs(adc_pmic->adc_irq),
 				irq_desc[adc_pmic->adc_irq].status,
 				(act && act->name) ? act->name : "???");
+		if (++debug_counter >= 100)
+			BUG_ON(1);
 		rc = -ETIMEDOUT;
 		goto configure_and_read_failed;
 	}
@@ -664,7 +663,7 @@ static int32_t pm8058_configure_and_read(uint32_t adc_instance, int32_t channels
 		*data |= ((1 << (8 * sizeof(*data) -
 			adc_pmic->adc_prop->bitresolution)) - 1) <<
 			adc_pmic->adc_prop->bitresolution;
-
+	debug_counter = 0;
 configure_and_read_failed:
 	adc_pmic->done = NULL;
 	mutex_unlock(&adc_mutex);
@@ -965,7 +964,7 @@ static int __devinit pm8058_xoadc_probe(struct platform_device *pdev)
 	queue_count = 0;
 	is_suspend = 0;
 
-	debug_counter = 1000;
+	debug_counter = 0;
 
 	return 0;
 

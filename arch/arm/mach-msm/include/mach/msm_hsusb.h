@@ -261,6 +261,8 @@ struct msm_otg_platform_data {
 	int (*init_vddcx)(int init);
 
 	struct pm_qos_request_list *pm_qos_req_dma;
+	int usb_oc_pin;
+	int usb_oc_irq;
 };
 
 struct msm_usb_host_platform_data {

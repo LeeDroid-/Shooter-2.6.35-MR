@@ -765,10 +765,12 @@ static void dbs_refresh_callback(struct work_struct *unused)
 
 static DECLARE_WORK(dbs_refresh_work, dbs_refresh_callback);
 
+static u32 enable_input_event = 0;
 static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
-	schedule_work_on(0, &dbs_refresh_work);
+	if (enable_input_event)
+		schedule_work_on(0, &dbs_refresh_work);
 }
 
 static int input_dev_filter(const char* input_dev_name)
@@ -986,6 +988,8 @@ static void __exit cpufreq_gov_dbs_exit(void)
 }
 
 
+module_param_call(enable_input_event, param_set_int, param_get_int,
+		&enable_input_event, S_IWUSR | S_IRUGO);
 MODULE_AUTHOR("Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>");
 MODULE_AUTHOR("Alexey Starikovskiy <alexey.y.starikovskiy@intel.com>");
 MODULE_DESCRIPTION("'cpufreq_ondemand' - A dynamic cpufreq governor for "

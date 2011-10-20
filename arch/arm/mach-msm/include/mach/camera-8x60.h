@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -468,14 +468,16 @@ struct axidata {
 	struct msm_pmem_region *region;
 };
 
-int msm_flash_ctrl(struct msm_camera_sensor_info *sdata,
-	struct flash_ctrl_data *flash_info);
+
+
 
 #ifdef CONFIG_MSM_CAMERA_FLASH
-	int msm_camera_flash_set_led_state(
-		struct msm_camera_sensor_flash_data *fdata,
-		unsigned led_state);
-	int msm_strobe_flash_init(struct msm_sync *sync, uint32_t sftype);
+int msm_camera_flash_set_led_state(
+	struct msm_camera_sensor_flash_data *fdata,
+	unsigned led_state);
+int msm_strobe_flash_init(struct msm_sync *sync, uint32_t sftype);
+int msm_flash_ctrl(struct msm_camera_sensor_info *sdata,
+			struct flash_ctrl_data *flash_info);
 #else
 	static inline int msm_camera_flash_set_led_state(
 		struct msm_camera_sensor_flash_data *fdata,
@@ -507,10 +509,9 @@ struct msm_v4l2_driver {
 	int (*get_frame) (struct msm_sync *, struct msm_frame *);
 	int (*put_frame) (struct msm_sync *, struct msm_frame *);
 #ifdef CONFIG_CAMERA_ZSL
-	int (*get_pict) (struct msm_sync *, struct msm_frame *);
-#else
-	int (*get_pict) (struct msm_sync *, struct msm_ctrl_cmd *);
+	int (*get_pict_zsl) (struct msm_sync *, struct msm_frame *);
 #endif
+	int (*get_pict) (struct msm_sync *, struct msm_ctrl_cmd *);
 	unsigned int (*drv_poll) (struct msm_sync *, struct file *,
 				struct poll_table_struct *);
 };

@@ -49,6 +49,7 @@ enum {
 	CHARGING_ENABLED,
 	FULL_BAT,
 	OVER_VCHG,
+	BATT_STATE,
 };
 
 struct battery_info_reply {
@@ -71,14 +72,13 @@ struct htc_battery_core {
 	int (*func_show_batt_attr)(struct device_attribute *attr, char *buf);
 	int (*func_get_battery_info)(struct battery_info_reply *buffer);
 	int (*func_charger_control)(enum charger_control_flag);
-	int (*func_is_temperature_fault)(int temp);
 	void (*func_set_full_level)(int full_level);
 };
 #ifdef CONFIG_HTC_BATT_CORE
-extern int htc_battery_core_update(unsigned int curr_level);
+extern int htc_battery_core_update_changed(void);
 extern int htc_battery_core_register(struct device *dev, struct htc_battery_core *htc_battery);
 #else
-static int htc_battery_core_update(unsigned int curr_level) { return 0; }
+static int htc_battery_core_update_changed(void) { return 0; }
 static int htc_battery_core_register(struct device *dev, struct htc_battery_core *htc_battery) { return 0; }
 #endif
 #endif

@@ -558,8 +558,8 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 	}
 
 	client_index = vid_enc_get_empty_client_index();
-
-	if (client_index == -1) {
+	/*HTC_START Fix Klocwork issue*/
+	if (client_index < 0) {/*HTC_END*/
 		ERR("%s() : No free clients client_index == -1\n",
 			__func__);
 		return -ENODEV;
@@ -604,11 +604,7 @@ static int vid_enc_release(struct inode *inode, struct file *file)
 #ifndef USE_RES_TRACKER
 	vidc_disable_clk();
 #endif
-	/*if (is_perf_lock_active(&media_perf_lock)) */
-	{
-		/*perf_unlock(&media_perf_lock);*/
-		switch_set_state(&venc_switch, VENC_STATE_OFF);
-	}
+	switch_set_state(&venc_switch, VENC_STATE_OFF);
 	INFO("msm_vidc_enc: Return from %s()", __func__);
 	return 0;
 }
@@ -1331,6 +1327,9 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 	case VEN_IOCTL_GET_SEQUENCE_HDR:
 	{
 		struct venc_seqheader seq_header, seq_header_user;
+		/*HTC_START Fix Klocwork issue*/
+		seq_header.hdrlen = 0;
+		/*HTC_END*/
 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
 			return -EFAULT;
 

@@ -17,30 +17,10 @@
 
 #include <linux/delay.h>
 #include <linux/pwm.h>
-#if 0
-#ifdef CONFIG_PMIC8058_PWM
-#include <linux/mfd/pmic8058.h>
-#include <linux/pmic8058-pwm.h>
-#endif
-#endif
 #include <mach/gpio.h>
 #include "msm_fb.h"
 
-#if 0
-#ifdef CONFIG_PMIC8058_PWM
-static struct pwm_device *bl_pwm0;
-static struct pwm_device *bl_pwm1;
-
-/* for samsung panel 300hz was the minimum freq where flickering wasnt
- * observed as the screen was dimmed
- */
-
-#define PWM_FREQ_HZ 300
-#define PWM_PERIOD_USEC (USEC_PER_SEC / PWM_FREQ_HZ)
-#define PWM_LEVEL 15
-#define PWM_DUTY_LEVEL (PWM_PERIOD_USEC / PWM_LEVEL)
-#endif
-#endif
+#define DEFAULT_BRIGHTNESS	158
 
 struct lcdc_auo_data {
 	struct msm_panel_common_pdata *pdata;
@@ -49,14 +29,53 @@ struct lcdc_auo_data {
 
 static struct lcdc_auo_data *dd;
 
+static void lcdc_auo_panel_set_backlight(struct msm_fb_data_type *mfd);
+
+static int bl_level_prevset = 1;
+
+static void lcdc_auo_panel_bkl_switch(struct msm_fb_data_type *mfd, bool on)
+{
+	unsigned int val = 0;
+
+	pr_info("lcdc_auo_panel_bkl_switch, on=%d\n", on);
+	if(on) {
+		val = mfd->bl_level;
+		if(val == 0) {
+			if(bl_level_prevset != 1) {
+				val = bl_level_prevset;
+				mfd->bl_level = val;
+			} else {
+				val = DEFAULT_BRIGHTNESS;
+				mfd->bl_level = val;
+			}
+		}
+		lcdc_auo_panel_set_backlight(mfd);
+	} else {
+		mfd->bl_level = 0;
+		lcdc_auo_panel_set_backlight(mfd);
+	}
+
+	return;
+}
+
+static void lcdc_auo_panel_bkl_ctrl(bool on)
+{
+	pr_info("lcdc_auo_panel_bkl_ctrl, on=%d\n", on);
+
+	return;
+}
+
 static void lcdc_auo_panel_set_backlight(struct msm_fb_data_type *mfd)
 {
-	int bl_level;
-	printk("%s: %d\n", __func__, mfd->bl_level);
+	int bl_level = mfd->bl_level;
 
-	bl_level = mfd->bl_level;
+	if ((bl_level & 0xf)==0)
+		pr_info("wxga %s: %d\n", __func__, bl_level);
+
 	if (dd->pdata->pmic_backlight && dd->pdata->shrink_pwm)
 		dd->pdata->pmic_backlight(dd->pdata->shrink_pwm(bl_level));
+		
+	bl_level_prevset = mfd->bl_level;
 }
 
 static int __devinit auo_probe(struct platform_device *pdev)
@@ -116,6 +135,8 @@ static struct platform_driver this_driver = {
 
 static struct msm_fb_panel_data auo_panel_data = {
 	.set_backlight = lcdc_auo_panel_set_backlight,
+	.bklswitch	= lcdc_auo_panel_bkl_switch,
+	.bklctrl	= lcdc_auo_panel_bkl_ctrl,
 };
 
 static struct platform_device this_device = {
@@ -151,11 +172,11 @@ static int __init lcdc_auo_panel_init(void)
 	if (dd && dd->pdata)
 		pinfo->bpp = dd->pdata->rgb_format();
 	pinfo->fb_num = 2;
-	pinfo->clk_rate = 69811000;
+	pinfo->clk_rate = 71100000;
 	pinfo->bl_max = 255;
 	pinfo->bl_min = 1;
 
-	pinfo->lcdc.h_back_porch = 64;
+	pinfo->lcdc.h_back_porch = 90;
 	pinfo->lcdc.h_front_porch = 64;
 	pinfo->lcdc.h_pulse_width = 32;
 	pinfo->lcdc.v_back_porch = 4;

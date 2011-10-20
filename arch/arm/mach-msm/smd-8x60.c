@@ -36,10 +36,15 @@
 #include <mach/system.h>
 #include <mach/board_htc.h>
 #include <mach/restart.h>
-
+#include <mach/board.h>
 #include "smd_private.h"
 #include "proc_comm.h"
 #include "modem_notifier.h"
+
+/* Added by HTC for forcing mdm9K to do the cache flush */
+#if defined(CONFIG_ARCH_MSM8X60_LTE)
+#include <mach/mdm.h>
+#endif
 
 #if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM8X60) \
 	|| defined(CONFIG_ARCH_MSM8960)
@@ -254,6 +259,11 @@ static void handle_modem_crash(void)
 {
 	pr_err("[SMD] MODEM/AMSS has CRASHED\n");
 	smd_diag();
+
+/* Added by HTC for forcing mdm9K to do the cache flush */
+#if defined(CONFIG_ARCH_MSM8X60_LTE)
+	charm_panic_notify();
+#endif
 
 	arm_pm_restart(RESTART_MODE_MODEM_CRASH, "force-hard");
 }
@@ -2007,7 +2017,11 @@ int smd_core_init(void)
 static int __devinit msm_smd_probe(struct platform_device *pdev)
 {
 	/* HTC: enable smd and smsm info messages */
-	msm_smd_debug_mask = 0xc;
+	msm_smd_debug_mask |= (MSM_SMD_INFO | MSM_SMSM_INFO);
+	/* Switch msm_smd_debug_mask by kernelflag */
+	if (get_kernel_flag() & BIT7)
+		msm_smd_debug_mask |= (MSM_SMD_DEBUG | MSM_SMSM_DEBUG);
+	pr_info("%s(): get msm_smd_debug_mask=0x%x\n", __func__, msm_smd_debug_mask);
 
 	SMD_INFO("smd probe\n");
 

@@ -710,7 +710,7 @@ static ssize_t fsg_show_file(struct device *dev, struct device_attribute *attr,
 		if (IS_ERR(p))
 			rc = PTR_ERR(p);
 		else {
-			rc = strlen(p);
+			rc = buf + (PAGE_SIZE - 1) - 1 - p;
 			memmove(buf, p, rc);
 			buf[rc] = '\n';		/* Add a newline */
 			buf[++rc] = 0;
@@ -758,6 +758,7 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	int		rc = 0;
 
 
+	printk(KERN_INFO "[USB] store_file: \"%s\"\n", buf);
 #ifndef CONFIG_USB_ANDROID_MASS_STORAGE
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed

@@ -328,7 +328,7 @@ static void suspend(struct work_struct *work)
 
 	pr_info("[R] suspend start\n");
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
-		pr_info("suspend: abort suspend\n");
+		pr_info("[R] suspend: abort suspend\n");
 		return;
 	}
 

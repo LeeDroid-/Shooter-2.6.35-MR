@@ -705,14 +705,14 @@ static int kgsl_dump_yamato(struct kgsl_device *device)
 		kgsl_dump_fields(" CP_STT=", lns, ARRAY_SIZE(lns));
 	}
 	kgsl_regread(device, RB_LRZ_VSC_CONTROL, &vsc_control);
-	KGSL_LOG_DUMP("RB_LRZ_VSC_CONTROL = %08X\n", vsc_control);
+        KGSL_LOG_DUMP("RB_LRZ_VSC_CONTROL = %08X\n", vsc_control);
 #endif
 
 	kgsl_regread(device, REG_SCRATCH_REG0, &r1);
 	KGSL_LOG_DUMP("SCRATCH_REG0       = %08X\n", r1);
 	kgsl_regread(device, REG_SCRATCH_REG6, &r1);
 	KGSL_LOG_DUMP("SCRATCH_REG6       = %08X\n", r1);
-
+ 
 	kgsl_regread(device, REG_COHER_SIZE_PM4, &r1);
 	kgsl_regread(device, REG_COHER_BASE_PM4, &r2);
 	kgsl_regread(device, REG_COHER_STATUS_PM4, &r3);
@@ -874,7 +874,7 @@ int kgsl_postmortem_dump(struct kgsl_device *device)
 	KGSL_DRV_FATAL("Dump Finished\n");
 
 	//sleep for keep log
-	hr_msleep(200);
+	hr_msleep(5000);
 
 	/* aleays bug on */
 	BUG_ON(true);

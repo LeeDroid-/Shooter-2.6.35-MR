@@ -55,6 +55,7 @@
 #define ACOUSTIC_UPDATE_AIC3254_INFO	_IOW(ACOUSTIC_IOCTL_MAGIC, 36, unsigned int)
 #define ACOUSTIC_GET_RECEIVER_STATE		_IOW(ACOUSTIC_IOCTL_MAGIC, 37, int)
 #define ACOUSTIC_SET_WB_SAMPLE_RATE		_IOW(ACOUSTIC_IOCTL_MAGIC, 38, int)
+#define ACOUSTIC_GET_SPEAKER_CHANNELS		_IOW(ACOUSTIC_IOCTL_MAGIC, 39, int)
 
 #define D(fmt, args...) printk(KERN_INFO "[AUD] htc-acoustic: "fmt, ##args)
 #define E(fmt, args...) printk(KERN_ERR "[AUD] htc-acoustic: "fmt, ##args)
@@ -468,6 +469,19 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	case ACOUSTIC_SET_WB_SAMPLE_RATE: {
 		msm_set_voc_freq(16000, 16000);
+		break;
+	}
+	case ACOUSTIC_GET_SPEAKER_CHANNELS: {
+
+		int channel = 2;
+		if (the_ops->get_speaker_channels)
+			channel = the_ops->get_speaker_channels();
+		D("get_speaker_channels: %d\n", channel);
+		if (copy_to_user((void *) arg,
+			&channel, sizeof(int))) {
+			E("acoustic_ioctl: ACOUSTIC_GET_SPEAKER_CHANNELS\n");
+			rc = -EFAULT;
+		}
 		break;
 	}
 

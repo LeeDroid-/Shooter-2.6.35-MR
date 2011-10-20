@@ -50,8 +50,6 @@
 #include "modem_notifier.h"
 #include "smd_rpc_sym.h"
 
-static unsigned kernel_flag;
-
 enum {
 	SMEM_LOG = 1U << 0,
 	RTR_DBG = 1U << 1,
@@ -132,6 +130,12 @@ if (smd_rpcrouter_debug_mask & NTFY_MSG) \
 #define RAW_PMW_NO_MASK(x...) do { } while (0)
 #define IO(x...) do { } while (0)
 #define NTFY(x...) do { } while (0)
+#endif
+#ifdef CONFIG_MACH_HOLIDAY
+extern int rtc_debug_flag;
+#define RTCLOG(x...) if(rtc_debug_flag) printk(KERN_DEBUG "[RTC]"x);
+#else
+#define RTCLOG(x...) do { } while (0)
 #endif
 
 
@@ -1197,6 +1201,7 @@ static int msm_rpc_write_pkt(
 	hdr->confirm_rx = 0;
 	hdr->size = count + sizeof(uint32_t);
 
+	RTCLOG("%s start\n",__func__);
 	for (;;) {
 		prepare_to_wait(&ept->restart_wait, &__wait,
 				TASK_INTERRUPTIBLE);
@@ -1217,9 +1222,11 @@ static int msm_rpc_write_pkt(
 
 	if (signal_pending(current) &&
 		(!(ept->flags & MSM_RPC_UNINTERRUPTIBLE))) {
+		RTCLOG("%s,%d signal_pending(current) && !ept->flags&MSM_RPC_UNINTERRUPTIBLE \n",__func__,__LINE__);
 		return -ERESTARTSYS;
 	}
 
+	RTCLOG("%s,%d after restart_wait\n",__func__,__LINE__);
 	if (r_ept) {
 		for (;;) {
 			prepare_to_wait(&r_ept->quota_wait, &__wait,
@@ -1237,6 +1244,7 @@ static int msm_rpc_write_pkt(
 		}
 		finish_wait(&r_ept->quota_wait, &__wait);
 
+		RTCLOG("%s,%d after quota_wait\n",__func__,__LINE__);
 		if (r_ept->quota_restart_state != RESTART_NORMAL) {
 			spin_lock(&ept->restart_lock);
 			ept->restart_state &= ~RESTART_PEND_NTFY;
@@ -1248,6 +1256,8 @@ static int msm_rpc_write_pkt(
 		if (signal_pending(current) &&
 		    (!(ept->flags & MSM_RPC_UNINTERRUPTIBLE))) {
 			spin_unlock_irqrestore(&r_ept->quota_lock, flags);
+			RTCLOG("%s,%d signal_pending(current) &&"
+				"! ept->flags & MSM_RPC_UNINTERRUPTIBLE \n",__func__,__LINE__);
 			return -ERESTARTSYS;
 		}
 		r_ept->tx_quota_cntr++;
@@ -1301,6 +1311,7 @@ static int msm_rpc_write_pkt(
 		return -ENETRESET;
 	}
 
+	RTCLOG("%s,%d after RESTART_NORMAL\n",__func__,__LINE__);
 	/* TODO: deal with full fifo */
 	xprt_info->xprt->write(hdr, sizeof(*hdr), HEADER);
 	RAW_HDR("[w rr_h] "
@@ -1349,6 +1360,7 @@ static int msm_rpc_write_pkt(
 	}
 #endif
 
+	RTCLOG("[RTC] %s stop\n",__func__);
 	return needed;
 }
 
@@ -1459,6 +1471,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 
 	/* snoop the RPC packet and enforce permissions */
 
+	RTCLOG("%s start\n",__func__);
 	/* has to have at least the xid and type fields */
 	if (count < (sizeof(uint32_t) * 2)) {
 		printk(KERN_ERR "rr_write: rejecting runt packet\n");
@@ -1571,6 +1584,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		spin_unlock_irqrestore(&ept->reply_q_lock, flags);
 	}
 
+	RTCLOG("%s stop\n",__func__);
 	return count;
 }
 EXPORT_SYMBOL(msm_rpc_write);
@@ -1653,6 +1667,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 
 	for (;;) {
 		rc = msm_rpc_read(ept, (void*) &reply, -1, timeout);
+		RTCLOG("%s msm_rpc_read rc=%d\n",__func__,rc);
 		if (rc < 0)
 			return rc;
 		if (rc < (3 * sizeof(uint32_t))) {
@@ -1718,6 +1733,7 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	int rc;
 
 	IO("READ on ept %p\n", ept);
+	RTCLOG("%s start\n",__func__);
 	spin_lock_irqsave(&ept->restart_lock, flags);
 	if (ept->restart_state !=  RESTART_NORMAL) {
 		ept->restart_state &= ~RESTART_PEND_NTFY;
@@ -1740,8 +1756,10 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 				timeout);
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
-			if (rc == 0)
+			if (rc == 0) {
+				RTCLOG("%s return timeout!!!\n",__func__);
 				return -ETIMEDOUT;
+			}
 		}
 	} else {
 		if (timeout < 0) {
@@ -1750,8 +1768,10 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 					      ept->forced_wakeup));
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
-			if (rc < 0)
+			if (rc < 0) {
+				RTCLOG("%s,%d return rc=%d!!!\n",__func__,__LINE__,rc);
 				return rc;
+			}
 		} else {
 			rc = wait_event_interruptible_timeout(
 				ept->wait_q,
@@ -1760,8 +1780,10 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 				timeout);
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
-			if (rc == 0)
+			if (rc == 0) {
+				RTCLOG("%s return timeout!!!\n",__func__);
 				return -ETIMEDOUT;
+			}
 		}
 	}
 
@@ -1815,6 +1837,7 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 		wake_unlock(&ept->read_q_wake_lock);
 	}
 	spin_unlock_irqrestore(&ept->read_q_lock, flags);
+	RTCLOG("%s stop\n",__func__);
 
 	return rc;
 }
@@ -2301,45 +2324,7 @@ void msm_rpcrouter_xprt_notify(struct rpcrouter_xprt *xprt, unsigned event)
 	wake_up(&xprt_info->read_wait);
 }
 
-#if 1 /* HTC */
-#define MODULE_NAME "smd_rpcrouter"
-static int kernel_flag_boot_config(char *str)
-{
-	unsigned check_bit_start = 0x100;
-	int i = 0 ;
-
-	if (!str)
-		return -EINVAL;
-
-	kernel_flag = simple_strtoul(str, NULL, 16);
-
-	pr_info(MODULE_NAME ": %s(): get kernel_flag=0x%x\n", __func__, kernel_flag);
-
-	/* kernel_flag <-> smd_rpcrouter_debug_mask mapping */
-	for (i = 0; i < 4; i++) {
-		switch (kernel_flag & (check_bit_start << i)) {
-		case BIT8:
-			smd_rpcrouter_debug_mask |= (RTR_DBG | NTFY_MSG);
-			break;
-		case BIT9:
-			smd_rpcrouter_debug_mask |= R2R_MSG;
-			break;
-		case BIT10:
-			smd_rpcrouter_debug_mask |= (R2R_RAW_HDR | RAW_PMR | RAW_PMW);
-			break;
-		case BIT11:
-			smd_rpcrouter_debug_mask |= RPC_MSG;
-			break;
-		default:
-			break;
-		}
-	}
-
-	pr_info(MODULE_NAME ": %s(): get smd_rpcrouter_debug_mask=0x%x\n", __func__, smd_rpcrouter_debug_mask);
-	return 0;
-}
-early_param("kernelflag", kernel_flag_boot_config);
-#endif  /* HTC */
+#include <mach/board_htc.h>
 
 static int __init rpcrouter_init(void)
 {
@@ -2347,6 +2332,17 @@ static int __init rpcrouter_init(void)
 
 	msm_rpc_connect_timeout_ms = 0;
 	smd_rpcrouter_debug_mask |= SMEM_LOG;
+	/* Switch smd_rpcrouter_debug_mask by kernelflag */
+	if (get_kernel_flag() & BIT8)
+		smd_rpcrouter_debug_mask |= (RTR_DBG | NTFY_MSG);
+	if (get_kernel_flag() & BIT9)
+		smd_rpcrouter_debug_mask |= R2R_MSG;
+	if (get_kernel_flag() & BIT10)
+		smd_rpcrouter_debug_mask |= (R2R_RAW_HDR | RAW_PMR | RAW_PMW);
+	if (get_kernel_flag() & BIT11)
+		smd_rpcrouter_debug_mask |= RPC_MSG;
+	pr_info("%s(): get smd_rpcrouter_debug_mask=0x%x\n", __func__, smd_rpcrouter_debug_mask);
+
 	debugfs_init();
 
 	/* Initialize what we need to start processing */

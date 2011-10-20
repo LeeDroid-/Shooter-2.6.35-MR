@@ -607,8 +607,6 @@ int __init board_mfg_mode_init(char *s)
 		mfg_mode = 4;
 	else if (!strcmp(s, "offmode_charging"))
 		mfg_mode = 5;
-	else if (!strcmp(s, "mfgkernel:diag58"))
-		mfg_mode = 6;
 
 	return 1;
 }
@@ -861,8 +859,9 @@ int msm_fixup(struct tag *tags, struct meminfo *mi)
 	}
 	return 0;
 }
+#endif
 
-static unsigned int radio_flag;
+static unsigned int radio_flag = 0;
 int __init radio_flag_init(char *s)
 {
 	radio_flag = simple_strtoul(s, 0, 16);
@@ -875,7 +874,7 @@ unsigned int get_radio_flag(void)
 	return radio_flag;
 }
 
-static unsigned int kernel_flag;
+static unsigned int kernel_flag = 0;
 int __init kernel_flag_init(char *s)
 {
 	kernel_flag = simple_strtoul(s, 0, 16);
@@ -887,7 +886,6 @@ unsigned int get_kernel_flag(void)
 {
 	return kernel_flag;
 }
-#endif
 
 BLOCKING_NOTIFIER_HEAD(psensor_notifier_list);
 

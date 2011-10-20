@@ -116,7 +116,7 @@ si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 		}
 
 #ifdef HTC_KlocWork
-    if ( cc!= NULL )
+    if( cc!= NULL )
     {
 #endif
 
@@ -132,7 +132,7 @@ si_sdiod_drive_strength_init(si_t *sih, osl_t *osh, uint32 drivestrength)
 	}
 
 #ifdef HTC_KlocWork
-    } /* cc!=NULL */
+    } // cc!=NULL
 #endif
 
 	/* Return to original core */

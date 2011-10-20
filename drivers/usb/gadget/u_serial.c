@@ -55,7 +55,7 @@
  * is managed in userspace ... OBEX, PTP, and MTP have been mentioned.
  */
 
-#define PREFIX	"ttyHSUSB"
+/* #define PREFIX	"ttyHSUSB" */
 
 /*
  * gserial is the lifecycle interface, used by USB functions

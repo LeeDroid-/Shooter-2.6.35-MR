@@ -34,7 +34,6 @@
 #include <mach/scm.h>
 #include <mach/board.h>
 #include "msm_watchdog.h"
-#include "htc_watchdog_monitor.h"
 
 #define TCSR_WDT_CFG 0x30
 
@@ -54,7 +53,7 @@ static struct workqueue_struct *msm_watchdog_wq;
  * On the kernel command line specify msm_watchdog.appsbark=1 to handle
  * watchdog barks on the apps side.
  * 2011-05-20: By default dog barks are processed by TrustZone.
- * 2011-06-08: By default dog barks are processed by Kernel side.
+ * 2011-06-10: By default dog barks are processed by app.
  */
 static int appsbark = 1;
 module_param(appsbark, int, S_IRUGO);
@@ -157,7 +156,6 @@ void pet_watchdog(void)
 {
 	writel(1, WDT0_RST);
 	last_pet = sched_clock();
-	htc_watchdog_pet_cpu_record();
 }
 
 static void pet_watchdog_work(struct work_struct *work)
@@ -200,9 +198,6 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	if (print_all_stacks) {
 		/* Suspend wdog until all stacks are printed */
 		msm_watchdog_suspend();
-
-		/* Dump top cpu loading processes */
-		htc_watchdog_top_stat();
 
 		/* Dump PC, LR, and registers. */
 		sysfs_printk_last_file();
@@ -306,8 +301,6 @@ static int __init init_watchdog(void)
 	writel(1, WDT0_EN);
 	writel(1, WDT0_RST);
 	last_pet = sched_clock();
-
-	htc_watchdog_monitor_init();
 
 	printk(KERN_INFO "MSM Watchdog Initialized\n");
 

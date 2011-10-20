@@ -401,15 +401,34 @@ static struct snddev_icodec_data snddev_imic_data = {
 	.channel_mode = 1,
 	.default_sample_rate = 48000,
 	.pamp_on = int_mic_enable,
-	.aic3254_id = VOICERECORD_IMIC,
+	.aic3254_id = VOICERECOGNITION_IMIC,
 	.aic3254_voc_id = CALL_UPLINK_IMIC_RECEIVER,
-	.default_aic3254_id = VOICERECORD_IMIC,
+	.default_aic3254_id = VOICERECOGNITION_IMIC,
 };
 
 static struct platform_device msm_imic_device = {
 	.name = "snddev_icodec",
 	.id = 1,
 	.dev = { .platform_data = &snddev_imic_data },
+};
+
+static struct snddev_icodec_data snddev_nomic_headset_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "nomic_headset_tx",
+	.copp_id = 1,
+	.profile = &imic_profile,
+	.channel_mode = 1,
+	.default_sample_rate = 48000,
+	.pamp_on = int_mic_enable,
+	.aic3254_id = VOICERECOGNITION_IMIC,
+	.aic3254_voc_id = CALL_UPLINK_IMIC_HEADSET,
+	.default_aic3254_id = VOICERECOGNITION_IMIC,
+};
+
+static struct platform_device msm_nomic_headset_tx_device = {
+	.name = "snddev_icodec",
+	.id = 40,
+	.dev = { .platform_data = &snddev_nomic_headset_data },
 };
 
 static struct adie_codec_action_unit headset_ab_cpls_48KHz_osr256_actions[] =
@@ -448,6 +467,26 @@ static struct platform_device msm_headset_stereo_device = {
 	.name = "snddev_icodec",
 	.id = 34,
 	.dev = { .platform_data = &snddev_ihs_stereo_rx_data },
+};
+
+static struct snddev_icodec_data snddev_nomic_ihs_stereo_rx_data = {
+	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
+	.name = "nomic_headset_stereo_rx",
+	.copp_id = 0,
+	.profile = &headset_ab_cpls_profile,
+	.channel_mode = 2,
+	.default_sample_rate = 48000,
+	.pamp_on = headset_enable,
+	.voltage_on = voltage_on,
+	.aic3254_id = PLAYBACK_HEADSET,
+	.aic3254_voc_id = CALL_DOWNLINK_IMIC_HEADSET,
+	.default_aic3254_id = PLAYBACK_HEADSET,
+};
+
+static struct platform_device msm_nomic_headset_stereo_device = {
+	.name = "snddev_icodec",
+	.id = 39,
+	.dev = { .platform_data = &snddev_nomic_ihs_stereo_rx_data },
 };
 
 static struct adie_codec_action_unit headset_anc_48KHz_osr256_actions[] =
@@ -548,9 +587,9 @@ static struct snddev_icodec_data snddev_ispkr_mic_data = {
 	.channel_mode = 1,
 	.default_sample_rate = 48000,
 	.pamp_on = int_mic_enable,
-	.aic3254_id = VOICERECORD_IMIC,
+	.aic3254_id = VOICERECOGNITION_IMIC,
 	.aic3254_voc_id = CALL_UPLINK_IMIC_SPEAKER,
-	.default_aic3254_id = VOICERECORD_IMIC,
+	.default_aic3254_id = VOICERECOGNITION_IMIC,
 };
 
 static struct platform_device msm_ispkr_mic_device = {
@@ -811,9 +850,9 @@ static struct snddev_icodec_data snddev_headset_mic_data = {
 	.channel_mode = 1,
 	.default_sample_rate = 48000,
 	.pamp_on = ext_mic_enable,
-	.aic3254_id = VOICERECORD_EMIC,
+	.aic3254_id = VOICERECOGNITION_EMIC,
 	.aic3254_voc_id = CALL_UPLINK_EMIC_HEADSET,
-	.default_aic3254_id = VOICERECORD_EMIC,
+	.default_aic3254_id = VOICERECOGNITION_EMIC,
 };
 
 static struct platform_device msm_headset_mic_device = {
@@ -962,39 +1001,6 @@ static struct platform_device msm_itty_mono_rx_device = {
 	.name = "snddev_icodec",
 	.id = 17,
 	.dev = { .platform_data = &snddev_itty_mono_rx_data },
-};
-
-#ifdef CONFIG_DEBUG_FS
-static struct adie_codec_action_unit
-	ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions[] =
-	HPH_PRI_D_LEG_STEREO;
-
-static struct adie_codec_hwsetting_entry
-	ihs_stereo_rx_class_d_legacy_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions =
-		ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE
-		(ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions),
-	}
-};
-
-static struct adie_codec_action_unit
-	ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions[] =
-	HPH_PRI_AB_LEG_STEREO;
-
-static struct adie_codec_hwsetting_entry
-	ihs_stereo_rx_class_ab_legacy_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions =
-		ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE
-		(ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions),
-	}
 };
 
 #if 1 //HTC created device
@@ -1147,7 +1153,118 @@ static struct platform_device msm_real_stereo_tx_device = {
 	.id = 26,  /* FIX ME */
 	.dev = { .platform_data = &snddev_idual_mic_endfire_real_stereo_data },
 };
+
+
+
+static struct adie_codec_action_unit iusb_headset_stereo_rx_48KHz_osr256_actions[] =
+	SPEAKER_HPH_AB_CPL_PRI_48000_OSR_256;
+
+static struct adie_codec_hwsetting_entry iusb_headset_stereo_settings[] = {
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions = iusb_headset_stereo_rx_48KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE(iusb_headset_stereo_rx_48KHz_osr256_actions),
+	}
+};
+
+static struct adie_codec_dev_profile iusb_headset_stereo_profile = {
+	.path_type = ADIE_CODEC_RX,
+	.settings = iusb_headset_stereo_settings,
+	.setting_sz = ARRAY_SIZE(iusb_headset_stereo_settings),
+};
+
+static struct snddev_icodec_data snddev_iusb_headset_stereo_rx_data = {
+	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
+	.name = "usb_headset_stereo_rx",
+	.copp_id = 0,
+	.profile = &iusb_headset_stereo_profile,
+	.channel_mode = 2,
+	.default_sample_rate = 48000,
+	.pamp_on = usb_headset_enable,
+	.voltage_on = voltage_on,
+	.aic3254_id = USB_AUDIO,
+	.aic3254_voc_id = USB_AUDIO,
+	.default_aic3254_id = USB_AUDIO,
+};
+
+static struct platform_device msm_iusb_headset_rx_device = {
+	.name = "snddev_icodec",
+	.id = 27,  /* FIX ME */
+	.dev = { .platform_data = &snddev_iusb_headset_stereo_rx_data },
+};
+
+static struct adie_codec_action_unit ispkr_mono_48KHz_osr256_actions[] =
+	SPEAKER_PRI_48000_OSR_256;
+
+static struct adie_codec_hwsetting_entry ispkr_mono_settings[] = {
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions = ispkr_mono_48KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE(ispkr_mono_48KHz_osr256_actions),
+	}
+};
+
+static struct adie_codec_dev_profile ispkr_mono_profile = {
+	.path_type = ADIE_CODEC_RX,
+	.settings = ispkr_mono_settings,
+	.setting_sz = ARRAY_SIZE(ispkr_mono_settings),
+};
+
+static struct snddev_icodec_data snddev_ispkr_mono_data = {
+	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
+	.name = "speaker_mono_rx",
+	.copp_id = 0,
+	.profile = &ispkr_mono_profile,
+	.channel_mode = 1,
+	.default_sample_rate = 48000,
+	.pamp_on = speaker_enable,
+	.voltage_on = voltage_on,
+	.aic3254_id = PLAYBACK_SPEAKER,
+	.aic3254_voc_id = CALL_DOWNLINK_IMIC_SPEAKER,
+	.default_aic3254_id = PLAYBACK_SPEAKER,
+};
+
+static struct platform_device msm_ispkr_mono_device = {
+	.name = "snddev_icodec",
+	.id = 28,
+	.dev = { .platform_data = &snddev_ispkr_mono_data },
+};
 #endif
+
+#ifdef CONFIG_DEBUG_FS
+static struct adie_codec_action_unit
+	ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions[] =
+	HPH_PRI_D_LEG_STEREO;
+
+static struct adie_codec_hwsetting_entry
+	ihs_stereo_rx_class_d_legacy_settings[] = {
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions =
+		ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE
+		(ihs_stereo_rx_class_d_legacy_48KHz_osr256_actions),
+	}
+};
+
+static struct adie_codec_action_unit
+	ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions[] =
+	HPH_PRI_AB_LEG_STEREO;
+
+static struct adie_codec_hwsetting_entry
+	ihs_stereo_rx_class_ab_legacy_settings[] = {
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions =
+		ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE
+		(ihs_stereo_rx_class_ab_legacy_48KHz_osr256_actions),
+	}
+};
 
 static void snddev_hsed_config_modify_setting(int type)
 {
@@ -1259,6 +1376,10 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_anc_headset_device,
 	&msm_real_stereo_tx_device,
 	&msm_ihac_device,
+	&msm_nomic_headset_tx_device,
+	&msm_nomic_headset_stereo_device,
+	&msm_iusb_headset_rx_device,
+	&msm_ispkr_mono_device
 };
 
 void htc_8x60_register_analog_ops(struct q6v2audio_analog_ops *ops)

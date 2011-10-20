@@ -223,6 +223,8 @@ startover:
 			if (end_of_data())
 				continue;
 
+			BUG_ON(next==NULL);
+
 			while (!match_token(next, data[block_idx])) {
 				/*
 				 * Special case, don't start over upon

@@ -104,7 +104,7 @@ static uint32_t gsbi9_gpio_table[] = {
 };
 
 static uint32_t gsbi10_gpio_table[] = {
-	GPIO_CFG(GSBI10_I2C_SCL, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(GSBI10_I2C_SDA, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(GSBI10_I2C_SCL, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
@@ -286,7 +286,7 @@ qup_i2c_interrupt(int irq, void *devid)
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1) {
 			writel((status1 & QUP_STATUS_ERROR_FLAGS),
-				dev->base + QUP_ERROR_FLAGS);
+					dev->base + QUP_ERROR_FLAGS);
 			/* Ensure that error flags are cleared before ISR
 			 * exits
 			 */
@@ -769,6 +769,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	if (dev->suspended) {
 		mutex_unlock(&dev->mlock);
+		dev_err(dev->dev, "qup_i2c_xfer: dev suspended, return Error!\n");
 		return -EIO;
 	}
 
@@ -1291,8 +1292,9 @@ err_request_irq_failed:
 err_gsbi_failed:
 	iounmap(dev->base);
 err_ioremap_failed:
-	kfree(dev);
 err_alloc_dev_failed:
+	if (dev)
+		kfree(dev);
 err_config_failed:
 	clk_put(clk);
 	if (pclk)
@@ -1338,11 +1340,13 @@ qup_i2c_remove(struct platform_device *pdev)
 	if (!(dev->pdata->use_gsbi_shared_mode)) {
 		gsbi_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 							"gsbi_qup_i2c_addr");
-		release_mem_region(gsbi_mem->start, resource_size(gsbi_mem));
+		if (gsbi_mem != NULL)
+			release_mem_region(gsbi_mem->start, resource_size(gsbi_mem));
 	}
 	qup_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"qup_phys_addr");
-	release_mem_region(qup_mem->start, resource_size(qup_mem));
+	if (qup_mem != NULL)
+		release_mem_region(qup_mem->start, resource_size(qup_mem));
 	return 0;
 }
 

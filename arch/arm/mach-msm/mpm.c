@@ -176,6 +176,7 @@ static uint16_t msm_mpm_bypassed_apps_irqs[] = {
 	LPASS_Q6SS_WDOG_EXPIRED,
 	TSENS_UPPER_LOWER_INT,
 	GSBI12_UARTDM_IRQ,
+	SDC4_IRQ_0,
 };
 
 static DEFINE_SPINLOCK(msm_mpm_lock);

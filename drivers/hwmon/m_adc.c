@@ -473,12 +473,12 @@ static void msm_adc_teardown_device(struct platform_device *pdev,
 	struct msm_adc_platform_data *pdata = pdev->dev.platform_data;
 	int i, num_chans = pdata->num_chan_supported;
 
-	if (msm_adc->sens_attr)
+	if (msm_adc->sens_attr) {
 		for (i = 0; i < num_chans; i++)
 			device_remove_file(&pdev->dev,
 					&msm_adc->sens_attr[i].dev_attr);
-
-	kfree(msm_adc->sens_attr);
+		kfree(msm_adc->sens_attr);
+	}
 }
 
 static void msm_adc_teardown(struct platform_device *pdev)
@@ -514,7 +514,7 @@ void msm_adc_wq_work(struct work_struct *work)
 	struct msm_adc_platform_data *pdata =
 					msm_adc_drv->pdev->dev.platform_data;
 	struct msm_adc_channels *channel = &pdata->channel[idx];
-	int32_t adc_code;
+	int32_t adc_code = 0;
 
 	switch (slot->adc_request) {
 	case START_OF_CONV:
@@ -602,7 +602,7 @@ static int __devinit msm_adc_init_hwmon(struct platform_device *pdev,
 	if (!msm_adc->sens_attr) {
 		dev_err(&pdev->dev, "Unable to allocate memory\n");
 		rc = -ENOMEM;
-		goto hwmon_err_sens;
+		return rc;
 	}
 
 	for (i = 0; i < num_chans; i++) {

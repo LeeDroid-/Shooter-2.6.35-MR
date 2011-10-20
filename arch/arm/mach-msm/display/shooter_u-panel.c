@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-msm/display/shooter-panel.c
+/* linux/arch/arm/mach-msm/display/shooter-panel_u.c
  *
  * Copyright (c) 2011 HTC.
  *
@@ -37,7 +37,7 @@
 #include <mach/debug_display.h>
 
 #include "../devices.h"
-#include "../board-shooter.h"
+#include "../board-shooter_u.h"
 #include "../devices-msm8x60.h"
 #include "../../../../drivers/video/msm_8x60/mdp_hw.h"
 #include "../../../../drivers/video/msm_8x60/mipi_dsi.h"
@@ -93,12 +93,12 @@ static struct pm8058_gpio clk_gpio_config_off = {
 
 /*
 TODO:
-1. move regulator initialization to shooter_panel_init()
+1. move regulator initialization to shooter_u_panel_init()
 */
 static struct regulator *l12_3v;
 static struct regulator *lvs1_1v8;
 
-static void shooter_panel_power(int onoff)
+static void shooter_u_panel_power(int onoff)
 {
 	static int init;
 	int ret;
@@ -221,7 +221,7 @@ static int mipi_panel_power(int on)
 
 	mipi_power_save_on = flag_on;
 
-	shooter_panel_power(on);
+	shooter_u_panel_power(on);
 
 	return 0;
 }
@@ -472,28 +472,32 @@ static struct dsi_cmd_desc novatek_3vci_cmds[] = {
 
 unsigned char shrink_br = BRI_SETTING_MAX;
 unsigned char last_br_2d = BRI_SETTING_MAX;
-static unsigned char shooter_shrink_pwm(int val)
+static unsigned char shooter_u_shrink_pwm(int val)
 {
 
 	if (val <= 0) {
 		shrink_br = 0;
 	} else if (val > 0 && (val < BRI_SETTING_MIN)) {
-                shrink_br = PWM_MIN;
-        } else if ((val >= BRI_SETTING_MIN) && (val <= BRI_SETTING_DEF)) {
-                shrink_br = (val - BRI_SETTING_MIN) * (PWM_DEFAULT - PWM_MIN) /
+		shrink_br = PWM_MIN;
+	} else if ((val >= BRI_SETTING_MIN) && (val <= BRI_SETTING_DEF)) {
+		shrink_br = (val - BRI_SETTING_MIN) * (PWM_DEFAULT - PWM_MIN) /
 			(BRI_SETTING_DEF - BRI_SETTING_MIN) + PWM_MIN;
-        } else if (val > BRI_SETTING_DEF && val <= BRI_SETTING_MAX) {
-                shrink_br = (val - BRI_SETTING_DEF) * (PWM_MAX - PWM_DEFAULT) /
+	} else if (val > BRI_SETTING_DEF && val <= BRI_SETTING_MAX) {
+		shrink_br = (val - BRI_SETTING_DEF) * (PWM_MAX - PWM_DEFAULT) /
 			(BRI_SETTING_MAX - BRI_SETTING_DEF) + PWM_DEFAULT;
-        } else if (val > BRI_SETTING_MAX)
-                shrink_br = PWM_MAX;
+	} else if (val > BRI_SETTING_MAX)
+		shrink_br = PWM_MAX;
 
-	if (atomic_read(&g_3D_mode) != OFF_3D && shrink_br != 0)
-		shrink_br = 255;
-	else if(val)
+	if (atomic_read(&g_3D_mode) != OFF_3D) {
+		shrink_br = 254;
+		//always refresh brightness value from AP if have but skip 254 which is trigger by 3Dpanel_on func
+		if(val != 254)
+			last_br_2d = val;
+	}
+	else if(val && atomic_read(&g_3D_mode) == OFF_3D)
 		last_br_2d = val;
 
-	PR_DISP_DEBUG("brightness orig=%d, transformed=%d\n", val, shrink_br);
+	PR_DISP_DEBUG("brightness orig=%d, transformed=%d last_2d %d\n", val, shrink_br, last_br_2d);
 
 	return shrink_br;
 }
@@ -553,7 +557,7 @@ int mdp_core_clk_rate_table[] = {
 	200000000,
 };
 
-struct mdp_reg shooter_color_v11[] = {
+struct mdp_reg shooter_u_color_v11[] = {
 	{0x93400, 0x0222, 0x0},
 	{0x93404, 0xFFE4, 0x0},
 	{0x93408, 0xFFFD, 0x0},
@@ -1099,15 +1103,15 @@ struct mdp_reg mdp_sharp_barrier_off[] = {
 };
 
 
-int shooter_mdp_color_enhance(void)
+int shooter_u_mdp_color_enhance(void)
 {
 	PR_DISP_INFO("%s\n", __func__);
-	//mdp_color_enhancement(shooter_color_v11, ARRAY_SIZE(shooter_color_v11));
+	//mdp_color_enhancement(shooter_u_color_v11, ARRAY_SIZE(shooter_u_color_v11));
 
 	return 0;
 }
 
-int shooter_mdp_gamma(void)
+int shooter_u_mdp_gamma(void)
 {
 	PR_DISP_INFO("%s\n", __func__);
 	mdp_color_enhancement(mdp_sharp_barrier_off, ARRAY_SIZE(mdp_sharp_barrier_off));
@@ -1123,8 +1127,8 @@ static struct msm_panel_common_pdata mdp_pdata = {
 #ifdef CONFIG_MSM_BUS_SCALING
 	.mdp_bus_scale_table = &mdp_bus_scale_pdata,
 #endif
-	.mdp_color_enhance = shooter_mdp_color_enhance,
-	.mdp_gamma = shooter_mdp_gamma,
+	.mdp_color_enhance = shooter_u_mdp_color_enhance,
+	.mdp_gamma = shooter_u_mdp_gamma,
 };
 
 static void __init msm_fb_add_devices(void)
@@ -1144,7 +1148,7 @@ TODO:
 1.find a better way to handle msm_fb_resources, to avoid passing it across file.
 2.error handling
  */
-int __init shooter_init_panel(struct resource *res, size_t size)
+int __init shooter_u_init_panel(struct resource *res, size_t size)
 {
 	int ret=0;
 
@@ -1154,7 +1158,7 @@ int __init shooter_init_panel(struct resource *res, size_t size)
 
 	PR_DISP_INFO("%s: %s\n", __func__, mipi_dsi_cmd_sharp_qhd_panel_device.name);
 
-	mipi_novatek_panel_data.shrink_pwm = shooter_shrink_pwm;
+	mipi_novatek_panel_data.shrink_pwm = shooter_u_shrink_pwm;
 
 	msm_fb_device.resource = res;
 	msm_fb_device.num_resources = size;
@@ -1167,26 +1171,24 @@ int __init shooter_init_panel(struct resource *res, size_t size)
 	return 0;
 }
 
-static void shooter_3Dpanel_on(bool bLandscape)
+static void shooter_u_3Dpanel_on(bool bLandscape)
 {
 	struct pw8058_pwm_config pwm_conf;
 	int rc;
 
+	led_brightness_switch("lcd-backlight", 254);
+
 	if (mipi_novatek_panel_data.mipi_send_cmds) {
 		mipi_novatek_panel_data.mipi_send_cmds(novatek_3vci_cmds, ARRAY_SIZE(novatek_3vci_cmds));
 	}
-	led_brightness_switch("lcd-backlight", 255);
-
-	if(system_rev >= 1) {
-		pwm_gpio_config.output_value = 1;
-		rc = pm8058_gpio_config(SHOOTER_3DLCM_PD, &pwm_gpio_config);
-		if (rc < 0)
-			pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_3DLCM_PD);
-	}
-
-	rc = pm8058_gpio_config(SHOOTER_3DCLK, &clk_gpio_config_on);
+	pwm_gpio_config.output_value = 1;
+	rc = pm8058_gpio_config(SHOOTER_U_3DLCM_PD, &pwm_gpio_config);
 	if (rc < 0)
-		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_3DCLK);
+		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_U_3DLCM_PD);
+
+	rc = pm8058_gpio_config(SHOOTER_U_3DCLK, &clk_gpio_config_on);
+	if (rc < 0)
+		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_U_3DCLK);
 
 	pwm_disable(pwm_3d);
 	pwm_conf.pwm_size = 9;
@@ -1200,43 +1202,41 @@ static void shooter_3Dpanel_on(bool bLandscape)
 
 	if(bLandscape) {
 		mdp_color_enhancement(mdp_sharp_barrier_on, ARRAY_SIZE(mdp_sharp_barrier_on));
-		gpio_set_value(SHOOTER_CTL_3D_1, 1);
-		gpio_set_value(SHOOTER_CTL_3D_2, 1);
-		gpio_set_value(SHOOTER_CTL_3D_3, 1);
-		gpio_set_value(SHOOTER_CTL_3D_4, 0);
+		gpio_set_value(SHOOTER_U_CTL_3D_1, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_2, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_3, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_4, 0);
 	} else {
 		mdp_color_enhancement(mdp_sharp_barrier_on, ARRAY_SIZE(mdp_sharp_barrier_on));
-		gpio_set_value(SHOOTER_CTL_3D_1, 1);
-		gpio_set_value(SHOOTER_CTL_3D_2, 1);
-		gpio_set_value(SHOOTER_CTL_3D_3, 0);
-		gpio_set_value(SHOOTER_CTL_3D_4, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_1, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_2, 1);
+		gpio_set_value(SHOOTER_U_CTL_3D_3, 0);
+		gpio_set_value(SHOOTER_U_CTL_3D_4, 1);
 	}
 }
 
-static void shooter_3Dpanel_off(void)
+static void shooter_u_3Dpanel_off(void)
 {
 	int rc;
+	pwm_gpio_config.output_value = 0;
 
 	if (mipi_novatek_panel_data.mipi_send_cmds) {
 		mipi_novatek_panel_data.mipi_send_cmds(novatek_2vci_cmds, ARRAY_SIZE(novatek_2vci_cmds));
 	}
 
-	if(system_rev >= 1) {
-		pwm_gpio_config.output_value = 0;
-		rc = pm8058_gpio_config(SHOOTER_3DLCM_PD, &pwm_gpio_config);
-		if (rc < 0)
-			pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_3DLCM_PD);
-	}
+	rc = pm8058_gpio_config(SHOOTER_U_3DLCM_PD, &pwm_gpio_config);
+	if (rc < 0)
+		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_U_3DLCM_PD);
 	mdp_color_enhancement(mdp_sharp_barrier_off, ARRAY_SIZE(mdp_sharp_barrier_off));
 	pwm_disable(pwm_3d);
 
-	rc = pm8058_gpio_config(SHOOTER_3DCLK, &clk_gpio_config_off);
+	rc = pm8058_gpio_config(SHOOTER_U_3DCLK, &clk_gpio_config_off);
 	if (rc < 0)
-		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_3DCLK);
-	gpio_set_value(SHOOTER_CTL_3D_1, 0);
-	gpio_set_value(SHOOTER_CTL_3D_2, 0);
-	gpio_set_value(SHOOTER_CTL_3D_3, 0);
-	gpio_set_value(SHOOTER_CTL_3D_4, 0);
+		pr_err("%s pmic gpio config gpio %d failed\n", __func__, SHOOTER_U_3DCLK);
+	gpio_set_value(SHOOTER_U_CTL_3D_1, 0);
+	gpio_set_value(SHOOTER_U_CTL_3D_2, 0);
+	gpio_set_value(SHOOTER_U_CTL_3D_3, 0);
+	gpio_set_value(SHOOTER_U_CTL_3D_4, 0);
 	led_brightness_switch("lcd-backlight", last_br_2d);
 }
 
@@ -1264,13 +1264,13 @@ static ssize_t store_3D_mode(struct device *dev,
 		PR_DISP_INFO("%s mode = %d\n", __func__, val);
 		switch (val) {
 		case LANDSCAPE_3D:
-			shooter_3Dpanel_on(true);
+			shooter_u_3Dpanel_on(true);
 			break;
 		case PORTRAIT_3D:
-			shooter_3Dpanel_on(false);
+			shooter_u_3Dpanel_on(false);
 			break;
 		case OFF_3D:
-			shooter_3Dpanel_off();
+			shooter_u_3Dpanel_off();
 			break;
 		default:
 			break;
@@ -1281,9 +1281,10 @@ static ssize_t store_3D_mode(struct device *dev,
 
 static DEVICE_ATTR(3D_mode, 0666, show_3D_mode, store_3D_mode);
 
-static int shooter_3Dpanel_probe(struct platform_device * pdev)
+static int shooter_u_3Dpanel_probe(struct platform_device * pdev)
 {
 	int err = 0;
+
 	printk(KERN_INFO "%s\n", __func__);
 
 	if(pwm_3d == NULL) {
@@ -1296,7 +1297,7 @@ static int shooter_3Dpanel_probe(struct platform_device * pdev)
 	return 0;
 }
 
-static int shooter_3Dpanel_remove(struct platform_device * pdev)
+static int shooter_u_3Dpanel_remove(struct platform_device * pdev)
 {
 	printk(KERN_INFO "%s\n", __func__);
 	if(pwm_3d) {
@@ -1309,25 +1310,24 @@ static int shooter_3Dpanel_remove(struct platform_device * pdev)
 	return 0;
 }
 
-struct platform_driver shooter_3Dpanel_driver = {
-	.probe	= shooter_3Dpanel_probe,
-	.remove	= shooter_3Dpanel_remove,
+struct platform_driver shooter_u_3Dpanel_driver = {
+	.probe	= shooter_u_3Dpanel_probe,
+	.remove	= shooter_u_3Dpanel_remove,
 	.driver	= {
 		.name = "panel_3d",
 	},
 };
 
-static int __init shooter_3Dpanel_init(void)
+static int __init shooter_u_3Dpanel_init(void)
 {
 	pr_info("%s(%d)\n", __func__, __LINE__);
-	return platform_driver_register(&shooter_3Dpanel_driver);
+	return platform_driver_register(&shooter_u_3Dpanel_driver);
 }
 
-static void __exit shooter_3Dpanel_exit(void)
+static void __exit shooter_u_3Dpanel_exit(void)
 {
-	platform_driver_unregister(&shooter_3Dpanel_driver);
+	platform_driver_unregister(&shooter_u_3Dpanel_driver);
 }
 
-module_init(shooter_3Dpanel_init);
-module_exit(shooter_3Dpanel_exit);
-
+module_init(shooter_u_3Dpanel_init);
+module_exit(shooter_u_3Dpanel_exit);

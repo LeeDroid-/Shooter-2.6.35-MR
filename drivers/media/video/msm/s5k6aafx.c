@@ -897,6 +897,7 @@ int s5k6aafx_sensor_open_init(struct msm_camera_sensor_info *data)
 			rc = s5k6aafx_i2c_write_table(&s5k6aafx_regs.clk_init_tb2[0],
 				s5k6aafx_regs.clk_init_tb2_size);
 		}
+
 		if (rc < 0)
 			goto init_fail;
 		/*sugest by samsung to pass CTS 2nd cam launch time*/
@@ -1174,7 +1175,6 @@ static int s5k6aafx_i2c_probe(struct i2c_client *client,
 	struct msm_camera_sensor_info *info = s5k6aafx_pdev->dev.platform_data;
 
 	if (s5k6aafx_client || s5k6aafx_sensorw) {
-		/* HTC Glenn 20110721 For klockwork issue */
 		if (s5k6aafx_client)
 			pr_info("[CAM]s5k6aafx_i2c_probe s5k6aafx_client \
 			existed 0x%X\n", s5k6aafx_client->addr);

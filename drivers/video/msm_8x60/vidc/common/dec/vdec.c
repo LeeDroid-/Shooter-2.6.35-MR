@@ -1664,7 +1664,8 @@ static int vid_dec_open(struct inode *inode, struct file *file)
 	}
 
 	client_index = vid_dec_get_empty_client_index();
-	if (client_index == -1) {
+/*HTC_START Fix Klocwork issue*/
+	if (client_index < 0) {/*HTC_END*/
 		ERR("%s() : No free clients client_index == -1\n", __func__);
 		mutex_unlock(&vid_dec_device_p->lock);
 		return -ENODEV;

@@ -254,8 +254,9 @@ struct msm_camera_sensor_info {
 	int cam_select_pin; /* for two sensors */
 	int mirror_mode; /* for sensor upside down */
 	int zero_shutter_mode; /* for doing zero shutter lag on MIPI */
+	int gpio_set_value_force; /*true: force to set gpio  */
 	int dev_node;
-	char *eeprom_data; /* qs_s5k4e1 */
+	char *eeprom_data;	/* qs_s5k4e1 */
 };
 
 
@@ -478,6 +479,11 @@ enum usb_connect_type {
 	CONNECT_TYPE_AC,
 	CONNECT_TYPE_9V_AC,
 	CONNECT_TYPE_WIRELESS,
+	CONNECT_TYPE_INTERNAL,
+#ifdef CONFIG_MACH_VERDI_LTE
+	/* Y cable with USB and 9V charger */
+	CONNECT_TYPE_USB_9V_AC,
+#endif
 };
 
 /* START: add USB connected notify function */
@@ -506,10 +512,23 @@ static LIST_HEAD(g_lh_calbe_detect_notifier_list);
 struct t_mhl_status_notifier{
 	struct list_head mhl_notifier_link;
 	const char *name;
-	void (*func)(bool isMHL, bool irq_enable);
+	void (*func)(bool isMHL, int charging_type);
 };
 int mhl_detect_register_notifier(struct t_mhl_status_notifier *);
 static LIST_HEAD(g_lh_mhl_detect_notifier_list);
+
+#if (defined(CONFIG_USB_OTG) && defined(CONFIG_USB_OTG_HOST))
+/***********************************
+Direction: cable detect drvier -> usb driver
+ ***********************************/
+struct t_usb_host_status_notifier{
+	struct list_head usb_host_notifier_link;
+	const char *name;
+	void (*func)(bool cable_in);
+};
+int usb_host_detect_register_notifier(struct t_usb_host_status_notifier *);
+static LIST_HEAD(g_lh_usb_host_detect_notifier_list);
+#endif
 /* END: add USB connected notify function */
 #else
 static inline void msm_hsusb_set_vbus_state(int online) {}

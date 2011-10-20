@@ -115,7 +115,7 @@ static DECLARE_WORK(vidc_work, vidc_work_handler);
 
 static int __devinit vidc_720p_probe(struct platform_device *pdev)
 {
-	struct resource *resource;
+	struct resource *pResource;
 	DBG("Enter %s()\n", __func__);
 
 	if (pdev->id) {
@@ -129,15 +129,15 @@ static int __devinit vidc_720p_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (unlikely(!resource)) {
+	pResource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (unlikely(!pResource)) {
 		ERR("%s(): Invalid resource\n", __func__);
 		return -ENXIO;
 	}
 
-	vidc_device_p->phys_base = resource->start;
-	vidc_device_p->virt_base = ioremap(resource->start,
-	resource->end - resource->start + 1);
+	vidc_device_p->phys_base = pResource->start;
+	vidc_device_p->virt_base = ioremap(pResource->start,
+	pResource->end - pResource->start + 1);
 
 	if (!vidc_device_p->virt_base) {
 		ERR("%s() : ioremap failed\n", __func__);

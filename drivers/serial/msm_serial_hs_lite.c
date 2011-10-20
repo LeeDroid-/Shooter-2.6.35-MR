@@ -70,8 +70,6 @@ struct msm_hsl_port {
 #endif
 };
 
-static int enable;
-
 #define UART_TO_MSM(uart_port)	((struct msm_hsl_port *) uart_port)
 #define is_console(port)	((port)->cons && \
 				(port)->cons->index == (port)->line)
@@ -727,6 +725,10 @@ static void msm_hsl_release_port(struct uart_port *port)
 		gsbi_resource = platform_get_resource_byname(pdev,
 							     IORESOURCE_MEM,
 							     "gsbi_resource");
+		if (unlikely(!gsbi_resource)) {
+			printk(KERN_ERR "%s: Can not get gsbi_resource!\n", __func__);
+			return;
+		}
 
 		size = gsbi_resource->end - gsbi_resource->start + 1;
 		release_mem_region(gsbi_resource->start, size);
@@ -1015,7 +1017,7 @@ static void msm_hsl_console_write(struct console *co, const char *s,
 static int __init msm_hsl_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
-	int baud, flow, bits, parity;
+	int baud = 0, flow, bits, parity;
 	int ret;
 
 	if (unlikely(co->index >= UART_NR || co->index < 0))
@@ -1271,27 +1273,18 @@ static struct platform_driver msm_hsl_platform_driver = {
 	},
 };
 
-static int kernel_flag_boot_config(char *str)
-{
-	unsigned long kernel_flag;
-
-	if (!str)
-		return -EINVAL;
-
-	kernel_flag = simple_strtoul(str, NULL, 16);
-
-	if (kernel_flag & BIT1)
-		enable = 1;
-
-	return 0;
-}
-early_param("kernelflag", kernel_flag_boot_config);
+#include <mach/board_htc.h>
+static int msm_serial_hsl_enable = 0;
 
 static int __init msm_serial_hsl_init(void)
 {
 	int ret;
 
-	if (!enable)
+	/* Switch uartdebug by kernelflag */
+	if (get_kernel_flag() & BIT1)
+		msm_serial_hsl_enable = 1;
+
+	if (!msm_serial_hsl_enable)
 		msm_hsl_uart_driver.cons = NULL;
 
 	ret = uart_register_driver(&msm_hsl_uart_driver);
@@ -1311,7 +1304,7 @@ static int __init msm_serial_hsl_init(void)
 static void __exit msm_serial_hsl_exit(void)
 {
 #ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
-	if (enable)
+	if (msm_serial_hsl_enable)
 		unregister_console(&msm_hsl_console);
 #endif
 	platform_driver_unregister(&msm_hsl_platform_driver);

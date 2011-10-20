@@ -1182,6 +1182,7 @@ static int fat_add_new_entries(struct inode *dir, void *slots, int nr_slots,
 	 * not important.
 	 */
 	i = n = copy = 0;
+	memset(bhs, 0, sizeof(bhs));
 	do {
 		start_blknr = blknr = fat_clus_to_blknr(sbi, cluster[i]);
 		last_blknr = start_blknr + sbi->sec_per_clus;
@@ -1249,6 +1250,7 @@ int fat_add_entries(struct inode *dir, void *slots, int nr_slots,
 	bh = prev = NULL;
 	pos = 0;
 	err = -ENOSPC;
+	memset(bhs, 0, sizeof(bhs));
 	while (fat_get_entry(dir, &pos, &bh, &de) > -1) {
 		/* check the maximum size of directory */
 		if (pos >= FAT_MAX_DIR_SIZE)

@@ -34,7 +34,7 @@
 
 #include "u_ether.h"
 #include "rndis.h"
-
+#include <mach/msm_hsusb_hw.h>
 
 /*
  * This function is an RNDIS Ethernet port -- a Microsoft protocol that's
@@ -416,6 +416,11 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 */
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_SEND_ENCAPSULATED_COMMAND:
+		if (w_length > 512) {
+			USB_WARNING("w_length > 512: w_length = %d, "
+				    "req->length = %d\n", w_length, req->length);
+			w_length = 32;
+		}
 		if (w_length > req->length || w_value
 				|| w_index != rndis->ctrl_id)
 			goto invalid;
@@ -760,6 +765,22 @@ rndis_unbind(struct usb_configuration *c, struct usb_function *f)
 	kfree(rndis);
 }
 
+static void
+rndis_release(struct usb_configuration *c, struct usb_function *f)
+{
+	struct f_rndis		*rndis = func_to_rndis(f);
+
+	rndis_deregister(rndis->config);
+	rndis_exit();
+
+	if (gadget_is_dualspeed(c->cdev->gadget))
+		usb_free_descriptors(f->hs_descriptors);
+	usb_free_descriptors(f->descriptors);
+
+	kfree(rndis->notify_req->buf);
+	usb_ep_free_request(rndis->notify, rndis->notify_req);
+}
+
 /* Some controllers can't support RNDIS ... */
 static inline bool can_support_rndis(struct usb_configuration *c)
 {
@@ -842,6 +863,7 @@ rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	rndis->port.func.set_alt = rndis_set_alt;
 	rndis->port.func.setup = rndis_setup;
 	rndis->port.func.disable = rndis_disable;
+	rndis->port.func.release = rndis_release;
 
 	/* start disabled */
 	rndis->port.func.hidden = 1;

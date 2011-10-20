@@ -434,6 +434,7 @@ extern void dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data)
 extern int dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag);
 extern uint dhd_bus_status(dhd_pub_t *dhdp);
 extern int  dhd_bus_start(dhd_pub_t *dhdp);
+extern void dhd_info_send_hang_message(dhd_pub_t *dhdp);
 
 extern void print_buf(void *pbuf, int len, int bytes_per_line);
 
@@ -540,6 +541,9 @@ enum pkt_filter_id {
 	ALLOW_DHCP,
 	ALLOW_IPV4_MULTICAST,
 	ALLOW_IPV6_MULTICAST,
+// packet filter for Rogers nat keep alive +++
+	DENY_NAT_KEEP_ALIVE = 201
+// packet filter for Rogers nat keep alive ---
 };
 int dhd_set_pktfilter(dhd_pub_t *dhd, int add, int id, int offset, char *mask, char *pattern);
 
@@ -562,5 +566,7 @@ extern void dhd_wait_event_wakeup(dhd_pub_t*dhd);
 extern int dhd_get_txrx_stats(struct net_device *net, unsigned long *rx_packets, unsigned long *tx_packets);
 /* The maximum consequent events of "out of bus->txq" */
 #define MAX_TXQ_FULL_EVENT 20
-
+// packet filter for Rogers nat keep alive +++
+extern void dhd_suspend_pktfilter(dhd_pub_t * dhd, int suspend);
+// packet filter for Rogers nat keep alive ---
 #endif /* _dhd_h_ */

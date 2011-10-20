@@ -513,11 +513,13 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 	/* For LiteOn snapshot, mandatory 2x upscale in order to make
 	 * output S_B_S_FULL */
 	if (!vpe_ctrl->pad_2k_bool) {
+
 		st_zoom_dx_t = pcrop->out2_w / 2;
 		if (STEREO_SNAP_BUFFER2_PROCESSING ==
 			sync->stereo_state) {
 			st_zoom_dx_t = 494;
 		}
+
 		st_zoom_dy_t = pcrop->out2_h;
 
 		zoom_dis_x = dis_offset->dis_offset_x *
@@ -525,8 +527,8 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 		zoom_dis_y = dis_offset->dis_offset_y *
 			pcrop->in2_h / st_zoom_dy_t;
 
-		src_x = zoom_dis_x + ((st_zoom_dx_t) - (pcrop->in2_w)) / 2;
-		src_y = zoom_dis_y + ((st_zoom_dy_t) - (pcrop->in2_h)) / 2;
+		src_x = zoom_dis_x + (st_zoom_dx_t - pcrop->in2_w) / 2;
+		src_y = zoom_dis_y + (st_zoom_dy_t - pcrop->in2_h) / 2;
 
 		pr_info("%s:[DBG]3D Snap D_X=%d, D_Y=%d, SRC_X=%d, SRC_Y=%d\n",
 			__func__, zoom_dis_x, zoom_dis_y, src_x, src_y);
@@ -798,13 +800,13 @@ static int vpe_proc_general(struct msm_vpe_cmd *cmd)
 		}
 		cmdp = kmalloc(VPE_OPERATION_MODE_CFG_LEN,
 					GFP_ATOMIC);
-		/* HTC_START Glenn 20110721 For klockwork issue */
+
 		if (!cmdp) {
 			pr_err("%s: cmdp allocation failed.\n", __func__);
 			rc = -ENOMEM;
 			goto vpe_proc_general_done;
 		}
-		/* HTC_END */
+
 		if (copy_from_user(cmdp,
 			(void __user *)(cmd->value),
 			VPE_OPERATION_MODE_CFG_LEN)) {
@@ -1378,7 +1380,8 @@ static struct platform_driver msm_vpe_driver = {
 static int __init msm_vpe_init(void)
 {
 	extern unsigned engineerid;
-	if (engineerid & 0x4)
+	extern unsigned system_rev;
+	if (system_rev == 0x80 && engineerid == 0x1)
 		return platform_driver_register(&msm_vpe_driver);
 	else
 		return 0;

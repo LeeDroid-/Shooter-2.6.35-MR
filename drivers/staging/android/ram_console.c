@@ -26,6 +26,12 @@
 #include <linux/rslib.h>
 #endif
 
+#ifdef CONFIG_MDM9K_ERROR_CORRECTION
+#include <mach/oem_rapi_client.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
+#endif
+
 struct ram_console_buffer {
 	uint32_t    sig;
 	uint32_t    start;
@@ -53,6 +59,16 @@ static int ram_console_bad_blocks;
 #define ECC_SIZE CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION_ECC_SIZE
 #define ECC_SYMSIZE CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION_SYMBOL_SIZE
 #define ECC_POLY CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION_POLYNOMIAL
+#endif
+#ifdef CONFIG_MDM9K_ERROR_CORRECTION
+#define MDM9K_BUFF_SIZE                 128
+#define MDM9K_CHECK_ERROR               2002
+static int RPC_READY;
+struct rpc_link {
+	struct delayed_work dwork;		/*check RPC ready*/
+	wait_queue_head_t rpcwq;		/*wait until RPC ready*/
+	struct msm_rpc_client *rpc_client;
+};
 #endif
 
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION
@@ -357,12 +373,133 @@ static int __init ram_console_module_init(void)
 }
 #endif
 
+#ifdef CONFIG_MDM9K_ERROR_CORRECTION
+/*
+ * check rpc link
+ * stop checking if 1. link establishs. 2. link did not establish after 35 seconds.
+ */
+static void rpc_check_func(struct work_struct* work)
+{
+	struct rpc_link *rpc;
+	static int count = 0;
+
+	if (count++ >= 35 ) {
+		printk("MDM9K_ERROR_CORRECTION fail due to RPC connection is not ready\n");
+		return;
+	}
+
+	rpc = container_of(work, struct rpc_link, dwork.work);
+	rpc->rpc_client = oem_rapi_client_init();
+
+	if (IS_ERR(rpc->rpc_client)) {
+		schedule_delayed_work(&rpc->dwork, msecs_to_jiffies(1000));
+		return;
+	}
+	else {
+		RPC_READY = 1;
+		wake_up(&rpc->rpcwq);
+	}
+}
+
+/*
+ * Get error message form mdm9k.
+ * MDM9K_CHECK_ERROR, and input number(0,1) are confirmed by radio team.
+ */
+void query_error_message(struct msm_rpc_client *rpc_client, char* buf, int check_number)
+{
+	struct oem_rapi_client_streaming_func_arg arg;
+        struct oem_rapi_client_streaming_func_ret ret;
+	int err, ret_len;
+	char input;
+
+	err = 0;
+	ret_len = MDM9K_BUFF_SIZE;
+	input = check_number;
+	arg.event = MDM9K_CHECK_ERROR;
+	arg.cb_func = NULL;
+	arg.handle = (void *)0;
+	arg.in_len = 1;
+	arg.input = &input;
+	arg.out_len_valid = 1;
+	arg.output_valid = 1;
+	arg.output_size = MDM9K_BUFF_SIZE;
+	ret.out_len = &ret_len;
+	ret.output = NULL;
+	err = oem_rapi_client_streaming_function(rpc_client, &arg, &ret);
+	if (!*ret.out_len) {
+		if (check_number == 0)
+			strcat(buf, "[SQA][ARM] no error occur\n");
+		else if (check_number == 1)
+			strcat(buf, "[SQA][QDSP6] no error occur\n");
+	}
+	else if (err) {
+		printk(KERN_ERR "ram_console: Receive data from modem failed: err = %d\n", err);
+	}
+	else {
+		ret.output[*ret.out_len] = '\n';
+		ret.output[*ret.out_len+1] = '\0';
+		if (check_number == 0)
+			strcpy(buf,ret.output);
+		else if (check_number == 1)
+			strcat(buf,ret.output);
+	}
+}
+/*
+ * Put error message in buf, and return buf length.
+ * due to RPC link need a long time to create (35~50 seconds).
+ * rpc_check_func() is used to check the link every 1 second(stop after 35 retries).
+ */
+int get_mdm9k_error_message(char * buf)
+{
+	struct rpc_link rpc;
+
+	rpc.rpc_client = ERR_PTR(-ENOMEM);
+
+	if (RPC_READY) {
+		rpc.rpc_client = oem_rapi_client_init();
+	}
+	else {
+		INIT_DELAYED_WORK(&rpc.dwork, rpc_check_func);
+		schedule_delayed_work(&rpc.dwork, msecs_to_jiffies(25000));
+		init_waitqueue_head(&rpc.rpcwq);
+		wait_event_timeout(rpc.rpcwq, RPC_READY == 1, msecs_to_jiffies(70000));
+		flush_delayed_work(&rpc.dwork); // avoid RPC_READY is set by others after schedule rpc.dwork
+	}
+
+	if(IS_ERR(rpc.rpc_client))
+	{
+		strcpy(buf, "[mdm9k] MDM9K_ERROR_CORRECTION fail due to RPC link is not ready\n");
+		return strlen(buf);
+	}
+
+	query_error_message(rpc.rpc_client, buf, 0);
+	query_error_message(rpc.rpc_client, buf, 1);
+	oem_rapi_client_close();
+	return strlen(buf);
+}
+#endif
 static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 				    size_t len, loff_t *offset)
 {
 	loff_t pos = *offset;
 	ssize_t count;
 
+#ifdef CONFIG_MDM9K_ERROR_CORRECTION
+	if (pos == ram_console_old_log_size)
+	{
+		char mdm9k_buf[256];
+		printk(KERN_INFO "ram_console: MDM9K error log collection start...\n");
+		memset(mdm9k_buf, 0, 256);
+		count = get_mdm9k_error_message(mdm9k_buf);
+		if (count == 0 )
+			return 0;
+		if (copy_to_user(buf, mdm9k_buf, count))
+	                return -EFAULT;
+
+		*offset += count;
+	        return count;
+	}
+#endif
 	if (pos >= ram_console_old_log_size)
 		return 0;
 

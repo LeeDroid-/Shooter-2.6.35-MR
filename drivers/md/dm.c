@@ -1102,6 +1102,8 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	struct bio_vec *bv = bio->bi_io_vec + idx;
 
 	clone = bio_alloc_bioset(GFP_NOIO, 1, bs);
+	if (!clone)
+		return NULL;
 	clone->bi_destructor = dm_bio_destructor;
 	*clone->bi_io_vec = *bv;
 
@@ -1133,6 +1135,8 @@ static struct bio *clone_bio(struct bio *bio, sector_t sector,
 	struct bio *clone;
 
 	clone = bio_alloc_bioset(GFP_NOIO, bio->bi_max_vecs, bs);
+	if (!clone)
+		return NULL;
 	__bio_clone(clone, bio);
 	clone->bi_rw &= ~(1 << BIO_RW_BARRIER);
 	clone->bi_destructor = dm_bio_destructor;
@@ -1224,6 +1228,8 @@ static int __clone_and_map(struct clone_info *ci)
 		clone = clone_bio(bio, ci->sector, ci->idx,
 				  bio->bi_vcnt - ci->idx, ci->sector_count,
 				  ci->md->bs);
+		if (!clone)
+			return -ENOMEM;
 		__map_bio(ti, clone, tio);
 		ci->sector_count = 0;
 
@@ -1248,6 +1254,8 @@ static int __clone_and_map(struct clone_info *ci)
 
 		clone = clone_bio(bio, ci->sector, ci->idx, i - ci->idx, len,
 				  ci->md->bs);
+		if (!clone)
+			return -ENOMEM;
 		__map_bio(ti, clone, tio);
 
 		ci->sector += len;
@@ -1278,6 +1286,8 @@ static int __clone_and_map(struct clone_info *ci)
 			clone = split_bvec(bio, ci->sector, ci->idx,
 					   bv->bv_offset + offset, len,
 					   ci->md->bs);
+			if (!clone)
+				return -ENOMEM;
 
 			__map_bio(ti, clone, tio);
 

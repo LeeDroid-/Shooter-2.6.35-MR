@@ -157,10 +157,10 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	osh = kmalloc(sizeof(osl_t), GFP_ATOMIC);
 	ASSERT(osh);
 #ifdef HTC_KlocWork
-	if (osh == NULL) {
-		printf("[HTCKW] osl_attach: osh == NULL\n");
-		return NULL;
-	}
+    if(osh == NULL) {
+        printf("[HTCKW] osl_attach: osh == NULL\n");
+        return NULL;
+    }
 #endif
 	bzero(osh, sizeof(osl_t));
 
@@ -222,7 +222,7 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 		skb_buff_ptr = dhd_os_prealloc(4, 0);
 
 #ifdef HTC_KlocWork
-    if (skb_buff_ptr != NULL)
+    if(skb_buff_ptr != NULL)
 #endif
 		bcopy(skb_buff_ptr, bcm_static_skb, sizeof(struct sk_buff *)*16);
 		for (i = 0; i < MAX_STATIC_PKT_NUM*2; i++)

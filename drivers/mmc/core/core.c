@@ -132,17 +132,19 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 
 		if (mrq->data) {
 #ifdef CONFIG_MMC_PERF_PROFILING
-			diff = ktime_sub(ktime_get(), host->perf.start);
-			if (mrq->data->flags == MMC_DATA_READ) {
-				host->perf.rbytes_drv +=
-						mrq->data->bytes_xfered;
-				host->perf.rtime_drv =
-					ktime_add(host->perf.rtime_drv, diff);
-			} else {
-				host->perf.wbytes_drv +=
-						 mrq->data->bytes_xfered;
-				host->perf.wtime_drv =
-					ktime_add(host->perf.wtime_drv, diff);
+			if ((host->card) && (host->card->type == MMC_TYPE_SD)) {
+				diff = ktime_sub(ktime_get(), host->perf.start);
+				if (mrq->data->flags == MMC_DATA_READ) {
+					host->perf.rbytes_drv +=
+							mrq->data->bytes_xfered;
+					host->perf.rtime_drv =
+						ktime_add(host->perf.rtime_drv, diff);
+				} else {
+					host->perf.wbytes_drv +=
+							mrq->data->bytes_xfered;
+					host->perf.wtime_drv =
+						ktime_add(host->perf.wtime_drv, diff);
+				}
 			}
 #endif
 			pr_debug("%s:     %d bytes transferred: %d\n",
@@ -221,7 +223,8 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 		}
 
 #ifdef CONFIG_MMC_PERF_PROFILING
-		host->perf.start = ktime_get();
+		if ((host->card) && (host->card->type == MMC_TYPE_SD))
+			host->perf.start = ktime_get();
 #endif
 	}
 	host->ops->request(host, mrq);

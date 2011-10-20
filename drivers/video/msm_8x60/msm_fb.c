@@ -698,6 +698,42 @@ static void msmfb_early_resume(struct early_suspend *h)
 						    early_suspend);
 	msm_fb_resume_sub(mfd);
 }
+
+#ifdef CONFIG_HTC_ONMODE_CHARGING
+static void msmfb_onchg_suspend(struct early_suspend *h)
+{
+	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
+						    onchg_suspend);
+#ifdef CONFIG_FB_MSM_OVERLAY
+	/*
+	* For MDP with overlay, set framebuffer with black pixels
+	* to show black screen on HDMI.
+	*/
+	struct fb_info *fbi = mfd->fbi;
+	switch (mfd->fbi->var.bits_per_pixel) {
+	case 32:
+		memset32_io((void *)fbi->screen_base, 0xFF000000,
+							fbi->fix.smem_len);
+		break;
+	default:
+		memset_io(fbi->screen_base, 0x00, fbi->fix.smem_len);
+		break;
+	}
+#endif
+	MSM_FB_INFO("%s starts.\n", __func__);
+	msm_fb_suspend_sub(mfd);
+	MSM_FB_INFO("%s is done.\n", __func__);
+}
+
+static void msmfb_onchg_resume(struct early_suspend *h)
+{
+	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
+						    onchg_suspend);
+	MSM_FB_INFO("%s starts.\n", __func__);
+	msm_fb_resume_sub(mfd);
+	MSM_FB_INFO("%s is done.\n", __func__);
+}
+#endif /* CONFIG_HTC_ONMODE_CHARGING */
 #endif
 
 void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl)
@@ -1250,6 +1286,12 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		mfd->early_suspend.resume = msmfb_early_resume;
 		mfd->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
 		register_early_suspend(&mfd->early_suspend);
+#ifdef CONFIG_HTC_ONMODE_CHARGING
+		mfd->onchg_suspend.suspend = msmfb_onchg_suspend;
+		mfd->onchg_suspend.resume = msmfb_onchg_resume;
+		mfd->onchg_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
+		register_onchg_suspend(&mfd->onchg_suspend);
+#endif
 	}
 #endif
 

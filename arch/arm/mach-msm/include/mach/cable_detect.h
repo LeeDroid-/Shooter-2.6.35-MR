@@ -7,11 +7,12 @@
 #define DOCK_STATE_CAR			(1 << 1)
 #define DOCK_STATE_USB_HEADSET		(1 << 2)
 #define DOCK_STATE_MHL			(1 << 3)
+#define DOCK_STATE_USB_HOST		(1 << 4)
 
 #define DOCK_DET_DELAY		HZ/4
 
 #define ADC_RETRY 3
-#define ADC_DELAY HZ/20
+#define ADC_DELAY HZ/8
 
 #define PM8058ADC_15BIT(adc) ((adc * 2200) / 32767) /* vref=2.2v, 15-bits resolution */
 
@@ -28,6 +29,13 @@ enum accessory_type {
 	CABLE_TYPE_UNKOWN = 0,
 	CABLE_TYPE_ID_PIN,
 	CABLE_TYPE_PMIC_ADC,
+};
+
+enum dpdn_path_type {
+	PATH_USB = 0,
+	PATH_MHL,
+	PATH_USB_AUD,
+	PATH_UART,
 };
 
 #if 0
@@ -47,7 +55,7 @@ struct usb_id_mpp_config_data {
 	void (*vbus_mpp_config)(void);
 	/* 1 : uart, 0 : usb */
 	void (*usb_uart_switch)(int);
-	void (*mhl_usb_switch)(int);
+	void (*usb_dpdn_switch)(int);
 
 	/* for accessory detection */
 	u8 accessory_type;
@@ -60,6 +68,10 @@ struct usb_id_mpp_config_data {
 	void (*config_usb_id_gpios)(bool enable);
 	void (*mhl_1v2_power)(bool enable);
 	int (*is_wireless_charger)(void);
+
+	int ac_9v_gpio;
+	void (*configure_ac_9v_gpio) (int);
+	u8 mhl_internal_3v3;
 
 #ifdef CONFIG_CABLE_DETECT_GPIO_DOCK
 	bool dock_detect;

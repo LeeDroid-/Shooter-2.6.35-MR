@@ -80,11 +80,6 @@ static int verify_stack(unsigned long sp)
 }
 #endif
 
-#ifdef CONFIG_MSM_WATCHDOG
-extern int msm_watchdog_suspend(void);
-extern int msm_watchdog_resume(void);
-#endif
-
 /*
  * Dump out the contents of some memory nicely...
  */
@@ -105,10 +100,6 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 
 	printk("%s%s(0x%08lx to 0x%08lx)\n", lvl, str, bottom, top);
 
-	#ifdef CONFIG_MSM_WATCHDOG
-	msm_watchdog_suspend();
-	#endif
-
 	for (first = bottom & ~31; first < top; first += 32) {
 		unsigned long p;
 		char str[sizeof(" 12345678") * 8 + 1];
@@ -127,10 +118,6 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 		}
 		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
 	}
-
-	#if CONFIG_MSM_WATCHDOG
-	msm_watchdog_resume();
-	#endif
 
 	set_fs(fs);
 }

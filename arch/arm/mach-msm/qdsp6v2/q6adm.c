@@ -94,7 +94,7 @@ void send_cal(int port_id, struct acdb_cal_block *aud_cal)
 	pr_debug("%s: Port id %d\n", __func__, port_id);
 
 	if (!aud_cal || aud_cal->cal_size == 0) {
-		pr_aud_err("%s: No calibration data to send!\n", __func__);
+		pr_aud_info("%s: No calibration data to send!\n", __func__);
 		goto done;
 	}
 

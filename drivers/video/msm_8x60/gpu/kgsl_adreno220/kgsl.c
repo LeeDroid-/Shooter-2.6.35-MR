@@ -1598,6 +1598,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		break;
 
 	case IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP:
+	case IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP_OLD:
 		result =
 		    kgsl_ioctl_cmdstream_freememontimestamp(dev_priv,
 						    (void __user *)arg);

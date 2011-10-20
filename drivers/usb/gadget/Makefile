@@ -79,6 +79,7 @@ obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
 obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o
 obj-$(CONFIG_USB_ANDROID_SERIAL)	+= serial.o u_serial.o
 obj-$(CONFIG_USB_F_SERIAL_SDIO)	+= u_sdio.o
+obj-$(CONFIG_USB_F_SERIAL_SMD)	+= u_smd.o
 obj-$(CONFIG_USB_ANDROID_PROJECTOR)	+= f_projector.o
 obj-$(CONFIG_USB_ANDROID_MTP)	+= f_mtp.o
 obj-$(CONFIG_USB_ANDROID_MTP36)	+= f_mtp36.o

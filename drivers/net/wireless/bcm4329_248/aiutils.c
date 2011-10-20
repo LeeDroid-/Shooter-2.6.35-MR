@@ -544,9 +544,9 @@ ai_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
 	}
 	ASSERT(r != NULL);
 #ifdef HTC_KlocWork
-    if (r == NULL) {
-		printf("[HTCKW] r is NULL at ai_corereg\n");
-		return 0;
+    if(r == NULL) {
+        printf("[HTCKW] r is NULL at ai_corereg\n");
+        return 0;
     }
 #endif
 	/* mask and set */

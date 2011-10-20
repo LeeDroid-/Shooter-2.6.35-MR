@@ -31,7 +31,7 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/oem_rapi_client.h>
 
-#define OEM_RAPI_PROG  0x3000006B
+#define OEM_RAPI_PROG  0x3001006B
 #define OEM_RAPI_VERS  0x00010001
 
 #define OEM_RAPI_NULL_PROC                        0
@@ -205,9 +205,10 @@ struct msm_rpc_client *oem_rapi_client_init(void)
 						      OEM_RAPI_PROG,
 						      OEM_RAPI_VERS, 0,
 						      oem_rapi_client_cb);
-		if (!IS_ERR(rpc_client))
-			open_count++;
 	}
+	if (!IS_ERR(rpc_client))
+		open_count++;
+
 	mutex_unlock(&oem_rapi_client_lock);
 	return rpc_client;
 }

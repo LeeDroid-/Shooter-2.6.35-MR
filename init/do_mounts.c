@@ -240,6 +240,7 @@ void __init mount_block_root(char *name, int flags)
 #else
 	const char *b = name;
 #endif
+	BUG_ON(fs_names == NULL);
 
 	get_fs_names(fs_names);
 retry:

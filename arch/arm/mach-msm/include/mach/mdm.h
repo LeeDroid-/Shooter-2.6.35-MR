@@ -53,5 +53,7 @@ struct charm_platform_data {
 
 /* Added by HTC */
 unsigned charm_get_MDM_error_flag(void);
+void charm_panic_notify(void);
+void charm_panic_wait_mdm_shutdown(void);
 /*---------------------------------------------*/
 #endif

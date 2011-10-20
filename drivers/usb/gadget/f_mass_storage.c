@@ -318,11 +318,6 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #include "storage_common.c"
 
-#ifdef CONFIG_PASCAL_DETECT
-extern struct switch_dev kddi_switch;
-extern atomic_t pascal_enable;
-#endif
-
 #ifdef CONFIG_USB_CSW_HACK
 static int write_error_after_csw_sent;
 static int csw_hack_sent;
@@ -335,6 +330,7 @@ struct fsg_dev;
 /* Data shared by all the FSG instances. */
 struct fsg_common {
 	struct usb_gadget	*gadget;
+	struct usb_composite_dev *cdev;
 	struct fsg_dev		*fsg, *new_fsg;
 	wait_queue_head_t	fsg_wait;
 
@@ -1687,37 +1683,6 @@ static int wedge_bulk_in_endpoint(struct fsg_dev *fsg)
 	return rc;
 }
 
-static int pad_with_zeros(struct fsg_dev *fsg)
-{
-	struct fsg_buffhd	*bh = fsg->common->next_buffhd_to_fill;
-	u32			nkeep = bh->inreq->length;
-	u32			nsend;
-	int			rc;
-
-	bh->state = BUF_STATE_EMPTY;		/* For the first iteration */
-	fsg->common->usb_amount_left = nkeep + fsg->common->residue;
-	while (fsg->common->usb_amount_left > 0) {
-
-		/* Wait for the next buffer to be free */
-		while (bh->state != BUF_STATE_EMPTY) {
-			rc = sleep_thread(fsg->common);
-			if (rc)
-				return rc;
-		}
-
-		nsend = min(fsg->common->usb_amount_left, FSG_BUFLEN);
-		memset(bh->buf + nkeep, 0, nsend - nkeep);
-		bh->inreq->length = nsend;
-		bh->inreq->zero = 0;
-		start_transfer(fsg, fsg->bulk_in, bh->inreq,
-				&bh->inreq_busy, &bh->state);
-		bh = fsg->common->next_buffhd_to_fill = bh->next;
-		fsg->common->usb_amount_left -= nsend;
-		nkeep = 0;
-	}
-	return 0;
-}
-
 static int throw_away_data(struct fsg_common *common)
 {
 	struct fsg_buffhd	*bh;
@@ -1819,10 +1784,14 @@ static int finish_reply(struct fsg_common *common)
 
 			common->next_buffhd_to_fill = bh->next;
 
-		/* For Bulk-only, if we're allowed to stall then send the
-		 * short packet and halt the bulk-in endpoint.  If we can't
-		 * stall, pad out the remaining data with 0's. */
-		} else if (common->can_stall) {
+		/*
+		 * For Bulk-only, mark the end of the data with a short
+		 * packet.  If we are allowed to stall, halt the bulk-in
+		 * endpoint.  (Note: This violates the Bulk-Only Transport
+		 * specification, which requires us to pad the data if we
+		 * don't halt the endpoint.  Presumably nobody will mind.)
+		 */
+		} else {
 			bh->inreq->zero = 1;
 			if (fsg_is_set(common))
 				start_transfer((common)->fsg, (common)->fsg->bulk_in,
@@ -1833,13 +1802,8 @@ static int finish_reply(struct fsg_common *common)
 
 
 			common->next_buffhd_to_fill = bh->next;
-			if (common->fsg)
+			if (common->can_stall)
 				rc = halt_bulk_in_endpoint(common->fsg);
-		} else if (fsg_is_set(common)) {
-			rc = pad_with_zeros(common->fsg);
-		} else {
-			/* Don't know what to do if common->fsg is NULL */
-			rc = -EIO;
 		}
 		break;
 
@@ -1848,6 +1812,9 @@ static int finish_reply(struct fsg_common *common)
 	case DATA_DIR_FROM_HOST:
 		if (common->residue == 0) {
 			/* Nothing to receive */
+		/* Don't know what to do if common->fsg is NULL */
+		} else if (!fsg_is_set(common)) {
+			rc = -EIO;
 
 		/* Did the host stop sending unexpectedly early? */
 		} else if (common->short_packet_received) {
@@ -2320,14 +2287,12 @@ static int do_scsi_command(struct fsg_common *common)
 		if (reply == 0)
 			reply = do_reserve(common, bh);
 		break;
-#ifdef CONFIG_PASCAL_DETECT
+#ifdef CONFIG_USB_ANDROID_ACM
 	case SC_PASCAL_MODE:
 		printk(KERN_INFO "SC_PASCAL_MODE\n");
-		if (!strncmp("RDEVCHG=PASCAL", (char *)&common->cmnd[1], 14)) {
+		if (!strncmp("RDEVCHG=PASCAL", (char *)&fsg->cmnd[1], 14)) {
 			printk(KERN_INFO "usb: switch to CDC ACM\n");
 			android_switch_function(0x400);
-			switch_set_state(&kddi_switch, 1);
-			atomic_set(&pascal_enable, 1);
 		}
 		break;
 #endif
@@ -2597,7 +2562,7 @@ static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	clear_bit(IGNORE_BULK_OUT, &fsg->atomic_bitflags);
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
-	return 0;
+	return USB_GADGET_DELAYED_STATUS;
 }
 
 static void fsg_disable(struct usb_function *f)
@@ -2740,6 +2705,8 @@ static void handle_exception(struct fsg_common *common)
 
 	case FSG_STATE_CONFIG_CHANGE:
 		do_set_interface(common, common->new_fsg);
+		if (common->new_fsg)
+			usb_composite_setup_continue(common->cdev);
 		switch_set_state(&the_fsg->sdev, !!common->new_fsg);
 		break;
 
@@ -2915,6 +2882,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	common->gadget = gadget;
 	common->ep0 = gadget->ep0;
 	common->ep0req = cdev->req;
+	common->cdev = cdev;
 
 	common->cdrom_cttype = cfg->cdrom_cttype;
 

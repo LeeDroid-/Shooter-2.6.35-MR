@@ -83,7 +83,6 @@ static int __init mipi_cmd_himax_720p_pt_init(void)
 	if (msm_fb_detect_client("mipi_cmd_himax_720p"))
 		return 0;
 #endif
-	pr_info("Daniel:%s:", __func__);
 
 	pinfo.xres = 720;
 	pinfo.yres = 1280;
@@ -131,7 +130,6 @@ static int __init mipi_cmd_himax_720p_pt_init(void)
 
 	ret = mipi_himax_device_register(&pinfo, MIPI_DSI_PRIM, MIPI_DSI_PANEL_WVGA_PT);
 
-	pr_info("Daniel:%s:end.", __func__);
 	if (ret)
 		pr_err("%s: failed to register device!\n", __func__);
 

@@ -563,9 +563,50 @@ int modem_to_userspace(void *buf, int r, int type, int is9k)
 }
 
 
+#if defined(CONFIG_MACH_VIGOR)
+static int vigor_diag_set(int enabled)
+{
+	unsigned original_sum;
 
+	DIAG_INFO("%s: %d\n", __func__, enabled);
+	original_sum = android_switch_sum();
+	if (enabled) {
+		/*lan(rmnet)+8K diag +9K diag  +(no modem)*/
+		original_sum |=  (1 << 3);//USB_FUNCTION_DIAG);
+		original_sum |=  (1 << 11); //USB_FUNCTION_DIAG_MDM);
+		original_sum |=  (1 << 12); //USB_FUNCTION_RMNET);
 
+		if (original_sum & (1 << 8))
+			original_sum ^=  (1 << 8);//USB_FUNCTION_MODEM);
+		if (original_sum & (1 << 14))
+			original_sum ^=  (1 << 14);//USB_FUNCTION_MODEM_MDM);
 
+	} else {
+		if (original_sum & (1 << 3))
+			original_sum ^=  (1 << 3);//USB_FUNCTION_DIAG);
+		if (original_sum & (1 << 11))
+			original_sum ^=  (1 << 11); //USB_FUNCTION_DIAG_MDM);
+		if (original_sum & (1 << 12))
+			original_sum ^=  (1 << 12); //USB_FUNCTION_RMNET);
+	}
+		DIAG_INFO("%s: set_sum=%x\n", __func__, original_sum);
+		android_switch_function(original_sum);
+	return 0;
+}
+
+static int vigor_diag_get(void)
+{
+	unsigned original_sum;
+
+	original_sum = android_switch_sum();
+	/*8k diag+9k diag+ rmnet*/
+	if ((original_sum & (1 << 3)) && (original_sum & (1 << 11)) && (original_sum & (1 << 12)))
+		return 1;
+	else
+		return 0;
+}
+
+#endif
 static long htc_diag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct diag_context *ctxt = &_context;
@@ -586,11 +627,11 @@ static long htc_diag_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		if (copy_from_user(&tmp_value, argp, sizeof(int)))
 			return -EFAULT;
 		DIAG_INFO("diag: enable %d\n", tmp_value);
-#if defined(CONFIG_USB_ANDROID_LTE_DIAG)
-		android_enable_function(&mdmctxt->function, tmp_value);
-#endif
+#if defined(CONFIG_MACH_VIGOR)
+		vigor_diag_set(tmp_value);
+#else
 		android_enable_function(&_context.function, tmp_value);
-
+#endif
 		diag_smd_enable(driver->ch, "diag_ioctl", tmp_value);
 #if defined(CONFIG_MACH_MECHA)
 		/* internal hub*/
@@ -602,7 +643,11 @@ static long htc_diag_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		wake_up(&ctxt->read_wq);
 	break;
 	case USB_DIAG_FUNC_IOC_ENABLE_GET:
+#if defined(CONFIG_MACH_VIGOR)
+		tmp_value = vigor_diag_get();
+#else
 		tmp_value = !_context.function.hidden;
+#endif
 		if (copy_to_user(argp, &tmp_value, sizeof(tmp_value)))
 			return -EFAULT;
 	break;
@@ -856,14 +901,12 @@ static int htc_diag_release(struct inode *ip, struct file *fp)
 		kfree(ctxt->user_read_buf);
 		ctxt->user_read_buf = 0;
 	}
-	if (!htc_write_buf_copy) {
+	if (htc_write_buf_copy) {
 		kfree(htc_write_buf_copy);
 		htc_write_buf_copy = 0;
 	}
-	if (!htc_write_diag_req) {
-		kfree(htc_write_diag_req);
+	if (htc_write_diag_req)
 		htc_write_diag_req = 0;
-	}
 	while ((req = req_get(ctxt, &ctxt->rx_req_idle)))
 		diag_req_free(req);
 	while ((req = req_get(ctxt, &ctxt->rx_req_user)))
@@ -1595,6 +1638,8 @@ int usb_diag_alloc_req(struct usb_diag_ch *ch, int n_write, int n_read)
 		return -ENODEV;
 
 	for (i = 0; i < n_write; i++) {
+		if (!ctxt->in)
+			goto fail;
 		req = usb_ep_alloc_request(ctxt->in, GFP_ATOMIC);
 		if (!req)
 			goto fail;
@@ -1603,6 +1648,8 @@ int usb_diag_alloc_req(struct usb_diag_ch *ch, int n_write, int n_read)
 	}
 
 	for (i = 0; i < n_read; i++) {
+		if (!ctxt->out)
+			goto fail;
 		req = usb_ep_alloc_request(ctxt->out, GFP_ATOMIC);
 		if (!req)
 			goto fail;
@@ -1855,6 +1902,31 @@ static int diag_function_set_alt(struct usb_function *f,
 	return rc;
 }
 
+static void diag_function_release(struct usb_configuration *c,
+		struct usb_function *f)
+{
+	struct diag_context *ctxt = func_to_dev(f);
+
+	DIAG_INFO("%s: dev=%s\n", __func__,
+		(ctxt == mdmctxt)?DIAG_MDM:DIAG_LEGACY);
+
+	if (!ctxt)
+		return;
+	if (gadget_is_dualspeed(c->cdev->gadget))
+		usb_free_descriptors(f->hs_descriptors);
+
+	usb_free_descriptors(f->descriptors);
+#if DIAG_XPST
+	if (ctxt == legacyctxt) {
+		misc_deregister(&htc_diag_device_fops);
+		misc_deregister(&diag2arm9_device);
+		ctxt->tx_count = ctxt->rx_count = 0;
+		ctxt->usb_in_count = ctxt->usb_out_count = 0;
+		driver->diag_smd_count = driver->diag_qdsp_count = 0;
+	}
+#endif
+}
+
 static void diag_function_unbind(struct usb_configuration *c,
 		struct usb_function *f)
 {
@@ -2002,6 +2074,7 @@ int diag_function_add(struct usb_configuration *c)
 	dev->function.unbind = diag_function_unbind;
 	dev->function.set_alt = diag_function_set_alt;
 	dev->function.disable = diag_function_disable;
+	dev->function.release = diag_function_release;
 	spin_lock_init(&dev->lock);
 	INIT_LIST_HEAD(&dev->read_pool);
 	INIT_LIST_HEAD(&dev->write_pool);

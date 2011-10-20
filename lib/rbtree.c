@@ -332,6 +332,7 @@ struct rb_node *rb_augment_erase_begin(struct rb_node *node)
 		deepest = node->rb_right;
 	else {
 		deepest = rb_next(node);
+		BUG_ON(deepest==NULL);
 		if (deepest->rb_right)
 			deepest = deepest->rb_right;
 		else if (rb_parent(deepest) != node)

@@ -439,10 +439,6 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	if (drv->snddev_vreg)
 		vreg_mode_vote(drv->snddev_vreg, 1, SNDDEV_HIGH_POWER_MODE);
 
-	/* Reuse pamp_on for TX platform-specific setup  */
-	if (icodec->data->pamp_on)
-		icodec->data->pamp_on(1);
-
 	if (support_aic3254_use_mclk) {
 		rc_clk = snddev_icodec_rxclk_enable(icodec, 1);
 		if (IS_ERR_VALUE(rc_clk)) {
@@ -542,6 +538,10 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 		else
 			adie_codec_set_master_mode(icodec->adie_path, 0);
 	}
+
+	/* Reuse pamp_on for TX platform-specific setup  */
+	if (icodec->data->pamp_on)
+		icodec->data->pamp_on(1);
 
 	icodec->enabled = 1;
 

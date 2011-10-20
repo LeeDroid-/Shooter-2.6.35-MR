@@ -100,7 +100,7 @@
 #include <linux/isl29029.h>
 #include <linux/mpu.h>
 
-#include "board-shooter.h"
+#include "board-shooter_u.h"
 #include "devices.h"
 #include "devices-msm8x60.h"
 #include "cpuidle.h"
@@ -117,7 +117,6 @@
 #include "gpiomux-8x60.h"
 #include "mpm.h"
 #include "rpm-regulator.h"
-#include "sysinfo-8x60.h"
 
 #include <mach/htc_usb.h>
 #include <mach/rpc_hsusb.h>
@@ -151,15 +150,6 @@ extern int panel_type;
 #define PM8058_MPP_BASE			(PM8058_GPIO_BASE + PM8058_GPIOS)
 #define PM8058_MPP_PM_TO_SYS(pm_gpio)	(pm_gpio + PM8058_MPP_BASE)
 
-
-// -----------------------------------------------------------------------------
-//                         External routine declaration
-// -----------------------------------------------------------------------------
-#ifdef CONFIG_FB_MSM_HDMI_MHL
-extern void sii9234_change_usb_owner(bool bMHL);
-#endif //CONFIG_FB_MSM_HDMI_MHL
-
-
 #define _GET_REGULATOR(var, name) do {				\
 	var = regulator_get(NULL, name);			\
 	if (IS_ERR(var)) {					\
@@ -169,6 +159,15 @@ extern void sii9234_change_usb_owner(bool bMHL);
 		return -ENODEV;					\
 	}							\
 } while (0)
+
+
+// -----------------------------------------------------------------------------
+//                         External routine declaration
+// -----------------------------------------------------------------------------
+#ifdef CONFIG_FB_MSM_HDMI_MHL
+extern void sii9234_change_usb_owner(bool bMHL);
+#endif //CONFIG_FB_MSM_HDMI_MHL
+
 
 unsigned engineerid, mem_size_mb;
 
@@ -292,15 +291,15 @@ static struct msm_acpu_clock_platform_data msm8x60_acpu_clock_data = {
 };
 
 #ifdef CONFIG_PERFLOCK
-static unsigned shooter_perf_acpu_table[] = {
+static unsigned shooter_u_perf_acpu_table[] = {
 	384000000,
 	756000000,
 	1188000000,
 };
 
-static struct perflock_platform_data shooter_perflock_data = {
-	.perf_acpu_table = shooter_perf_acpu_table,
-	.table_size = ARRAY_SIZE(shooter_perf_acpu_table),
+static struct perflock_platform_data shooter_u_perflock_data = {
+	.perf_acpu_table = shooter_u_perf_acpu_table,
+	.table_size = ARRAY_SIZE(shooter_u_perf_acpu_table),
 };
 #endif
 
@@ -425,7 +424,7 @@ static void config_gpio_table(uint32_t *table, int len)
 	}
 }
 
-static int shooter_phy_init_seq[] = { 0x06, 0x36, 0x0C, 0x31, 0x31, 0x32, 0x1, 0x0E, 0x1, 0x11, -1 };
+static int shooter_u_phy_init_seq[] = { 0x06, 0x36, 0x0C, 0x31, 0x31, 0x32, 0x1, 0x0E, 0x1, 0x11, -1 };
 static struct regulator *ldo6_3p3;
 static struct regulator *ldo7_1p8;
 
@@ -542,55 +541,31 @@ static int msm_hsusb_ldo_enable(int on)
  }
 
 static uint32_t usb_uart_input_pulldown_switch_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_CPU_WIMAX_UART_EN, 0, GPIO_CFG_INPUT,
-		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_GPIO_MHL_USB_EN, 0, GPIO_CFG_INPUT,
+	GPIO_CFG(SHOOTER_U_GPIO_MHL_USB_EN, 0, GPIO_CFG_INPUT,
 		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 };
-
+/*
 static uint32_t usb_uart_switch_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_CPU_WIMAX_UART_EN, 0, GPIO_CFG_OUTPUT,
+	GPIO_CFG(SHOOTER_U_GPIO_MHL_USB_EN, 0, GPIO_CFG_OUTPUT,
 		GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_GPIO_MHL_USB_EN, 0, GPIO_CFG_OUTPUT,
+};
+*/
+static uint32_t mhl_usb_switch_table[] = {
+	GPIO_CFG(SHOOTER_U_GPIO_MHL_USB_SW, 0, GPIO_CFG_OUTPUT,
 		GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
-static void config_shooter_usb_uart_gpios(int uart)
+
+static void config_shooter_u_usb_uart_gpios(int uart)
 {
-	if (board_build_flag() == SHIP_BUILD) {
-		/*XC HW has auto switch of usb/uart*/
-		if (system_rev <= 1) {
-			config_gpio_table(usb_uart_switch_table, ARRAY_SIZE(usb_uart_switch_table));
-
-			printk("%s: %d, rev=%d, ship build\n", __func__, uart, system_rev);
-			/* Switch to USB for ship build*/
-			gpio_set_value(SHOOTER_GPIO_MHL_USB_EN, 0);
-			gpio_set_value(SHOOTER_GPIO_CPU_WIMAX_UART_EN, 1);
-		}
-	} else {
-		/*XC HW has auto switch of usb/uart*/
-		if (system_rev <= 1) {
-			config_gpio_table(usb_uart_switch_table, ARRAY_SIZE(usb_uart_switch_table));
-
-			printk("%s: %d, rev=%d\n", __func__, uart, system_rev);
-			if (uart) {
-				/* Switch to UART */
-				gpio_set_value(SHOOTER_GPIO_CPU_WIMAX_UART_EN, 0);
-				gpio_set_value(SHOOTER_GPIO_MHL_USB_EN, 1);
-			} else {
-				/* Switch to USB */
-				gpio_set_value(SHOOTER_GPIO_MHL_USB_EN, 0);
-				gpio_set_value(SHOOTER_GPIO_CPU_WIMAX_UART_EN, 1);
-			}
-		}
-	}
- }
+	/*HW has auto switch of usb/uart*/
+}
 
 static struct msm_hsusb_platform_data msm_hsusb_pdata = {
-	.phy_init_seq		= shooter_phy_init_seq,
+	.phy_init_seq		= shooter_u_phy_init_seq,
 	.ldo_init		 = msm_hsusb_ldo_init,
 	.ldo_enable		 = msm_hsusb_ldo_enable,
-	.usb_uart_switch	= config_shooter_usb_uart_gpios,
+	.usb_uart_switch	= config_shooter_u_usb_uart_gpios,
 	.pclk_src_name	= "dfab_usb_hs_clk",
 };
 
@@ -653,34 +628,34 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 static void mhl_sii9234_1v2_power(bool enable);
 #endif
 static uint32_t usb_ID_PIN_input_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_USB_ID, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_GPIO_USB_ID, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t usb_ID_PIN_ouput_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_USB_ID, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_GPIO_USB_ID, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
-void config_shooter_usb_id_gpios(bool output)
+void config_shooter_u_usb_id_gpios(bool output)
 {
 	if (output) {
 		config_gpio_table(usb_ID_PIN_ouput_table, ARRAY_SIZE(usb_ID_PIN_ouput_table));
-		gpio_set_value(SHOOTER_GPIO_USB_ID, 1);
-		printk(KERN_INFO "%s %d output high\n",  __func__, SHOOTER_GPIO_USB_ID);
+		gpio_set_value(SHOOTER_U_GPIO_USB_ID, 1);
+		printk(KERN_INFO "%s %d output high\n",  __func__, SHOOTER_U_GPIO_USB_ID);
 	} else {
 		config_gpio_table(usb_ID_PIN_input_table, ARRAY_SIZE(usb_ID_PIN_input_table));
-		printk(KERN_INFO "%s %d input none pull\n",  __func__, SHOOTER_GPIO_USB_ID);
+		printk(KERN_INFO "%s %d input none pull\n",  __func__, SHOOTER_U_GPIO_USB_ID);
 	}
 }
 
 static uint32_t mhl_reset_pin_ouput_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_MHL_RESET, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(SHOOTER_U_GPIO_MHL_RESET, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
 };
 
 static uint32_t mhl_usb_switch_ouput_table[] = {
-	GPIO_CFG(SHOOTER_GPIO_MHL_USB_SW, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(SHOOTER_U_GPIO_MHL_USB_SW, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
 };
 
-void config_shooter_mhl_gpios(void)
+void config_shooter_u_mhl_gpios(void)
 {
 	config_gpio_table(mhl_usb_switch_ouput_table, ARRAY_SIZE(mhl_usb_switch_ouput_table));
 	config_gpio_table(mhl_reset_pin_ouput_table, ARRAY_SIZE(mhl_reset_pin_ouput_table));
@@ -699,21 +674,26 @@ static void pm8058_usb_config(void)
 		printk(KERN_INFO "%s: MPP 11 fail\n", __func__);
 }
 
-static void shooter_mhl_usb_switch(int mhl)
+static void shooter_u_usb_dpdn_switch(int path)
 {
-	int polarity = 1; /* high = mhl */
+	switch (path) {
+	case PATH_USB:
+	case PATH_MHL:
+	{
+		int polarity = 1; /* high = mhl */
+		int mhl = (path == PATH_MHL);
 
-	config_gpio_table(mhl_usb_switch_ouput_table,
+		config_gpio_table(mhl_usb_switch_ouput_table,
 				ARRAY_SIZE(mhl_usb_switch_ouput_table));
 
-	if (system_rev == 0)
-		polarity = 0; /* low = mhl */
-
-	pr_info("[CABLE] %s, mhl %d, polarity %d\n", __func__, mhl, polarity);
-	gpio_set_value(SHOOTER_GPIO_MHL_USB_SW, (mhl ^ !polarity) ? 1 : 0);
+		pr_info("[CABLE] %s: Set %s path\n", __func__, mhl ? "MHL" : "USB");
+		gpio_set_value(SHOOTER_U_GPIO_MHL_USB_SW, (mhl ^ !polarity) ? 1 : 0);
+		break;
+	}
+	}
 
 	#ifdef CONFIG_FB_MSM_HDMI_MHL
-	sii9234_change_usb_owner(mhl);
+	sii9234_change_usb_owner((path==PATH_MHL)?1:0);
 	#endif //CONFIG_FB_MSM_HDMI_MHL
 }
 
@@ -722,14 +702,14 @@ static struct cable_detect_platform_data cable_detect_pdata = {
 	.vbus_mpp_config 	= pm8058_usb_config,
 	.vbus_mpp_irq		= PM8058_CBLPWR_IRQ(PM8058_IRQ_BASE),
 	.detect_type = CABLE_TYPE_PMIC_ADC,
-	.usb_id_pin_gpio = SHOOTER_GPIO_USB_ID,
-	.mhl_reset_gpio = SHOOTER_GPIO_MHL_RESET,
-	.mhl_usb_switch		= shooter_mhl_usb_switch,
+	.usb_id_pin_gpio = SHOOTER_U_GPIO_USB_ID,
+	.usb_dpdn_switch = shooter_u_usb_dpdn_switch,
+	.mhl_reset_gpio = SHOOTER_U_GPIO_MHL_RESET,
 	.mpp_data = {
 		.usbid_mpp	=  XOADC_MPP_4,
 		.usbid_amux	= PM_MPP_AIN_AMUX_CH5,
 	},
-	.config_usb_id_gpios = config_shooter_usb_id_gpios,
+	.config_usb_id_gpios = config_shooter_u_usb_id_gpios,
 #ifdef CONFIG_FB_MSM_HDMI_MHL
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
 #endif
@@ -759,8 +739,8 @@ static struct platform_device usb_mass_storage_device = {
 };
 
 static struct android_usb_platform_data android_usb_pdata = {
-	.vendor_id	= 0x0BB4,
-	.product_id	= 0x0cba,
+	.vendor_id	= 0x0bb4,
+	.product_id	= 0x0ccf,
 	.version	= 0x0100,
 	.product_name		= "Android Phone",
 	.manufacturer_name	= "HTC",
@@ -820,9 +800,9 @@ static int flashlight_control(int mode)
 static void config_flashlight_gpios(void)
 {
 	static uint32_t flashlight_gpio_table[] = {
-		GPIO_CFG(SHOOTER_TORCH_EN, 0, GPIO_CFG_OUTPUT,
+		GPIO_CFG(SHOOTER_U_TORCH_EN, 0, GPIO_CFG_OUTPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-		GPIO_CFG(SHOOTER_FLASH_EN, 0, GPIO_CFG_OUTPUT,
+		GPIO_CFG(SHOOTER_U_FLASH_EN, 0, GPIO_CFG_OUTPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	};
 
@@ -832,10 +812,10 @@ static void config_flashlight_gpios(void)
 
 static struct flashlight_platform_data flashlight_data = {
 	.gpio_init = config_flashlight_gpios,
-	.torch = SHOOTER_TORCH_EN,
-	.flash = SHOOTER_FLASH_EN,
-	.torch_set1 = PM8058_GPIO_PM_TO_SYS(SHOOTER_TORCH_SET1),
-	.torch_set2 = PM8058_GPIO_PM_TO_SYS(SHOOTER_TORCH_SET2),
+	.torch = SHOOTER_U_TORCH_EN,
+	.flash = SHOOTER_U_FLASH_EN,
+	.torch_set1 = PM8058_GPIO_PM_TO_SYS(SHOOTER_U_TORCH_SET1),
+	.torch_set2 = PM8058_GPIO_PM_TO_SYS(SHOOTER_U_TORCH_SET2),
 	.flash_duration_ms = 600,
 	.chip_model = AAT1277,
 };
@@ -849,83 +829,82 @@ static struct platform_device flashlight_device = {
 #endif
 
 static uint32_t camera_off_gpio_table_sp3d[] = {
-	GPIO_CFG(SHOOTER_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
-	GPIO_CFG(SHOOTER_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
-	GPIO_CFG(SHOOTER_SP3D_MCLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
-	GPIO_CFG(106, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),/*sharp INT*/
-	GPIO_CFG(SHOOTER_SP3D_SPI_DO, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DI, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CS, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_GATE, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_CORE_GATE, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SYS_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_PDX, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_WEBCAM_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera reset*/
-	GPIO_CFG(SHOOTER_WEBCAM_STB, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera standby*/
-	GPIO_CFG(SHOOTER_CAM_SEL, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera switch*/
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SDA	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SCL	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
+	GPIO_CFG(SHOOTER_U_SP3D_MCLK		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
+	GPIO_CFG(SHOOTER_U_SP3D_INT		, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),/*sharp INT*/
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DO	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DI	, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CS	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CLK	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_GATE		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_CORE_GATE	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SYS_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_PDX		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera reset*/
+	GPIO_CFG(SHOOTER_U_WEBCAM_STB	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera standby*/
+	GPIO_CFG(SHOOTER_U_CAM_SEL		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera switch*/
 };
 
 static uint32_t camera_off_gpio_table_liteon[] = {
-	GPIO_CFG(SHOOTER_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
-	GPIO_CFG(SHOOTER_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
-	GPIO_CFG(SHOOTER_SP3D_MCLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
-	GPIO_CFG(106, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),/*sharp INT*/
-	GPIO_CFG(SHOOTER_SP3D_SPI_DO, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DI, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CS, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CLK, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_S5K4E1_VCM_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_S5K4E1_INTB, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_S5K4E1_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_WEBCAM_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera reset*/
-	GPIO_CFG(SHOOTER_WEBCAM_STB, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera standby*/
-	GPIO_CFG(SHOOTER_CAM_SEL, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera switch*/
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SDA	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SCL	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),/*i2c*/
+	GPIO_CFG(SHOOTER_U_SP3D_MCLK		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
+	GPIO_CFG(SHOOTER_U_SP3D_INT		, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),/*sharp INT*/
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DO	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DI	, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CS	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CLK	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_VCM_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_INTB, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera reset*/
+	GPIO_CFG(SHOOTER_U_WEBCAM_STB	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera standby*/
+	GPIO_CFG(SHOOTER_U_CAM_SEL		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*camera switch*/
 };
 
-
 static uint32_t camera_on_gpio_table_sp3d[] = {
-	GPIO_CFG(SHOOTER_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_SP3D_MCLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_6MA),/*MCLK*/
-	GPIO_CFG(106, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DO,  1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DI,  1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CS,  1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_GATE, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_CORE_GATE, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SYS_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_PDX, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_WEBCAM_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_WEBCAM_STB, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_CAM_SEL, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SDA	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SCL	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_MCLK		, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
+	GPIO_CFG(SHOOTER_U_SP3D_INT		, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DO	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DI	, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CS	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CLK	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_GATE		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_CORE_GATE, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SYS_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_PDX		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_STB	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_CAM_SEL		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t camera_on_gpio_table_liteon[] = {
-	GPIO_CFG(SHOOTER_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_SP3D_MCLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_6MA),/*MCLK*/
-	GPIO_CFG(106, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DO,  0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DI,  0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CS,  0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CLK, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_S5K4E1_VCM_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_S5K4E1_INTB, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_S5K4E1_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_WEBCAM_RST, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_WEBCAM_STB, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_CAM_SEL, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SDA	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SCL	, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_MCLK		, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),/*MCLK*/
+	GPIO_CFG(SHOOTER_U_SP3D_INT		, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DO	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DI	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CS	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CLK	, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_VCM_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_INTB, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_S5K4E1_PD, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_RST	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_WEBCAM_STB	, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_CAM_SEL		, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 #ifdef CONFIG_SP3D
 static uint32_t sp3d_spi_gpio[] = {
 	/* or this? the i/o direction and up/down are much more correct */
-	GPIO_CFG(SHOOTER_SP3D_SPI_DO,  1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_DI,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CS,  1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_SP3D_SPI_CLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DO,  1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_DI,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CS,  1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_SP3D_SPI_CLK, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA),
 };
 #endif
 
@@ -1005,24 +984,27 @@ static int camera_sensor_power_disable(char *power)
 }
 
 
-static void shooter_set_gpio(int gpio, int state){
+static void shooter_u_set_gpio(int gpio, int state){
 	gpio_set_value(gpio, state);
 }
 
 #ifdef CONFIG_SP3D
-static int Shooter_sp3d_vreg_on(void)
+static int Shooter_U_sp3d_vreg_on(void)
 {
 	int rc;
-	pr_info("[Camera]%s\n", __func__);
+	pr_info("[Camera]%s %d\n", __func__, system_rev);
 	/* VDDIO*/
-	if(system_rev == 2 && engineerid >= 3){/*VERSION A*/
+	if(system_rev == 0x80)/*VERSION A*/
+	{
 		rc = camera_sensor_power_enable_8901("8901_lvs2");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs2\", 1800) == %d\n", rc);
 		udelay(26);
 		/*DVDD18 */
 		rc = camera_sensor_power_enable_8901("8901_lvs3");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs3\", 1800) == %d\n", rc);
-	}else{
+	}
+	else
+	{
 		rc = camera_sensor_power_enable("8058_l8", 1800000);
 		pr_info("[Camera]sensor_power_enable(\"8058_l8\", 1800) == %d\n", rc);
 		udelay(26);
@@ -1030,11 +1012,10 @@ static int Shooter_sp3d_vreg_on(void)
 		rc = camera_sensor_power_enable("8058_l9", 1800000);
 		pr_info("[Camera]sensor_power_enable(\"8058_l9\", 1800) == %d\n", rc);
 	}
-
-	shooter_set_gpio(SHOOTER_SP3D_CORE_GATE, 1); // CORE GATE
-	shooter_set_gpio(SHOOTER_SP3D_SYS_RST, 1); // RST
-	shooter_set_gpio(SHOOTER_SP3D_PDX, 1); // PDX
-	shooter_set_gpio(SHOOTER_SP3D_GATE, 1); // GATE
+	shooter_u_set_gpio(SHOOTER_U_SP3D_CORE_GATE, 1); // CORE GATE
+	shooter_u_set_gpio(SHOOTER_U_SP3D_SYS_RST, 1); // RST
+	shooter_u_set_gpio(SHOOTER_U_SP3D_PDX, 1); // PDX
+	shooter_u_set_gpio(SHOOTER_U_SP3D_GATE, 1); // GATE
 	/* main camera AVDD */
 	rc = camera_sensor_power_enable("8058_l15", 2800000);
 	pr_info("[Camera]sensor_power_enable(\"8058_l15\", 2800) == %d\n", rc);
@@ -1048,62 +1029,62 @@ static int Shooter_sp3d_vreg_on(void)
 	return rc;
 }
 
-static int Shooter_sp3d_vreg_off(void)
+static int Shooter_U_sp3d_vreg_off(void)
 {
 	int rc;
 	pr_info("[Camera]%s\n", __func__);
-	shooter_set_gpio(SHOOTER_SP3D_PDX, 0); // PDX
+	shooter_u_set_gpio(SHOOTER_U_SP3D_PDX, 0); // PDX
 	/* main camera MVDD */
 	rc = camera_sensor_power_disable("8058_l10");
 	udelay(10);
 
-	if (!(engineerid == 7)) {	//according to logic Jason Kao, only tutn off l15 when sharp
-	/* main camera AVDD */
+	//according to optical Jason Kao, don't turn off l15 to avoid current leakage when liteon
+	if (!(system_rev == 0x80 && engineerid == 0x1))
+	{
+		/* main camera AVDD */
 		rc = camera_sensor_power_disable("8058_l15");
 		udelay(10);
 	}
-	if(system_rev == 2 && engineerid >= 3){
-		/* main camera DVDD18 */
-		rc = camera_sensor_power_disable("8901_lvs3");
-		shooter_set_gpio(SHOOTER_SP3D_SYS_RST, 0); // RST
-		shooter_set_gpio(SHOOTER_SP3D_CORE_GATE, 0); // CORE GATE
-		shooter_set_gpio(SHOOTER_SP3D_GATE, 0); // GATE
-		/*VDDIO*/
-		rc = camera_sensor_power_disable("8901_lvs2");
-	}else{
-		/* main camera DVDD18 */
-		rc = camera_sensor_power_disable("8058_l9");
-		shooter_set_gpio(SHOOTER_SP3D_SYS_RST, 0); // RST
-		shooter_set_gpio(SHOOTER_SP3D_CORE_GATE, 0); // CORE GATE
-		shooter_set_gpio(SHOOTER_SP3D_GATE, 0); // GATE
-		/*VDDIO*/
-		rc = camera_sensor_power_disable("8058_l8");
-	}
 
+	/* main camera DVDD18 */
+	if(system_rev == 0x80)/*VERSION A*/
+		rc = camera_sensor_power_disable("8901_lvs3");
+	else
+		rc = camera_sensor_power_disable("8058_l9");
+
+	shooter_u_set_gpio(SHOOTER_U_SP3D_SYS_RST, 0); // RST
+	shooter_u_set_gpio(SHOOTER_U_SP3D_CORE_GATE, 0); // CORE GATE
+	shooter_u_set_gpio(SHOOTER_U_SP3D_GATE, 0); // GATE
+
+	if(system_rev == 0x80)/*VERSION A*/
+		rc = camera_sensor_power_disable("8901_lvs2");
+	else
+		rc = camera_sensor_power_disable("8058_l8");
 	return rc;
 }
 #endif
-
+	
 #ifdef CONFIG_QS_S5K4E1
-static int Shooter_qs_s5k4e1_vreg_on(void)
+static int Shooter_U_qs_s5k4e1_vreg_on(void)
 {
 	int rc;
-	pr_info("[Camera]%s\n", __func__);
+	pr_info("[Camera]%s %x\n", __func__, system_rev);
 	mdelay(50);
 
 	rc = camera_sensor_power_enable("8058_l15", 2800000);
 	pr_info("[Camera]sensor_power_enable(\"8058_l15\", 1800) == %d\n", rc);
 	udelay(50);
-
-	if(system_rev >= 2 && engineerid >= 3){/*VERSION A*/
+	
+	if(system_rev == 0x80){/*VERSION A*/
 		/*IO*//*This is switch power*/
 		rc = camera_sensor_power_enable_8901("8901_lvs3");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs3\", 1800) == %d\n", rc);
-		mdelay(1);
+		mdelay(10);
 		
 		rc = camera_sensor_power_enable_8901("8901_lvs2");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs2\", 1800) == %d\n", rc);
-	}else {
+	}else 
+	{
 		rc = camera_sensor_power_enable("8058_l9", 1800000);
 		pr_info("[Camera]sensor_power_enable(\"8058_l9\", 1800) == %d\n", rc);
 		/* VDDIO*/
@@ -1117,32 +1098,36 @@ static int Shooter_qs_s5k4e1_vreg_on(void)
 	pr_info("[Camera]sensor_power_enable(\"8058_l10\", 2800) == %d\n", rc);
 	udelay(50);
 
-	shooter_set_gpio(SHOOTER_S5K4E1_INTB, 1);
-	shooter_set_gpio(SHOOTER_S5K4E1_PD, 1);
-	shooter_set_gpio(SHOOTER_S5K4E1_VCM_PD, 1);
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_INTB, 1);
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_PD, 1);
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_VCM_PD, 1);
 
 	return rc;
 }
 
-static int Shooter_qs_s5k4e1_vreg_off(void)
+static int Shooter_U_qs_s5k4e1_vreg_off(void)
 {
 	int rc;
 	pr_info("[Camera]%s\n", __func__);
-	shooter_set_gpio(SHOOTER_S5K4E1_INTB, 0); // interrupt
-	shooter_set_gpio(SHOOTER_S5K4E1_VCM_PD, 0); // PDX
-	shooter_set_gpio(SHOOTER_S5K4E1_PD, 0); // RST
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_INTB, 0); // interrupt
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_VCM_PD, 0); // PDX
+	shooter_u_set_gpio(SHOOTER_U_S5K4E1_PD, 0); // RST
 
 	/* main camera AVDD */
 	rc = camera_sensor_power_disable("8058_l10");
 	udelay(50);
-	
+
 	/*VDDIO*/
-	if(system_rev >= 2 && engineerid >= 3){/*VERSION A*/
+	if(system_rev == 0x80){/*VERSION A*/
 		rc = camera_sensor_power_disable("8901_lvs2");
 		/*This is swich power*/
+		mdelay(10);
+
 		rc = camera_sensor_power_disable("8901_lvs3");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs3\", 1800) == %d\n", rc);
-	}else{
+	}
+	else
+	{
 		/*This is swich power*/
 		rc = camera_sensor_power_disable("8058_l9");
 		pr_info("[Camera]sensor_power_disable(\"8058_l9\") == %d\n", rc);
@@ -1150,90 +1135,93 @@ static int Shooter_qs_s5k4e1_vreg_off(void)
 		pr_info("[Camera]sensor_power_disable(\"8058_l8\") == %d\n", rc);
 	}
 
-	//according to logic Jason Kao, do not turn off l15 to avoid current leakage
-	if (!(engineerid == 7)) 
+	//according to optical Jason Kao, don't turn off l15 to avoid current leakage when liteon
+	if (!(system_rev == 0x80 && engineerid == 0x1))
 	{
 		rc = camera_sensor_power_disable("8058_l15");
 		udelay(50);
 	}
+
 	return rc;
 }
 #endif
 
-static int Shooter_s5k6aafx_vreg_on(void)
+static int Shooter_U_s5k6aafx_vreg_on(void)
 {
 	int rc;
 	pr_info("[Camera]%s\n", __func__);
 	/* main / 2nd camera analog power */
-	rc = camera_sensor_power_enable("8058_l3", 2850000);
-	pr_info("[Camera]sensor_power_enable(\"8058_l3\", 2850) == %d\n", rc);
+	rc = camera_sensor_power_enable("8901_l6", 2850000);
+	pr_info("[Camera]sensor_power_enable(\"8901_l6\", 2850) == %d\n", rc);
 	mdelay(5);
-	/* main / 2nd camera digital power */
-	if(system_rev == 2 && engineerid >= 3){
+
+	if(system_rev == 0x80){/*VERSION A*/
 		rc = camera_sensor_power_enable_8901("8901_lvs2");
-		pr_info("[Camera]sensor_power_enable(\"8901_lvs2\", 1800) == %d\n", rc);
-		mdelay(5);
-		/*IO*/
-		rc = camera_sensor_power_enable_8901("8901_lvs3");
 		pr_info("[Camera]sensor_power_enable(\"8901_lvs3\", 1800) == %d\n", rc);
-		mdelay(1);
-		
-	}else{
-		rc = camera_sensor_power_enable("8058_l8", 1800000);
-		pr_info("[Camera]sensor_power_enable(\"8058_l8\", 1800) == %d\n", rc);
-		mdelay(5);
-		/*IO*/
-		rc = camera_sensor_power_enable("8058_l9", 1800000);
-		pr_info("[Camera]sensor_power_enable(\"8058_l9\", 1800) == %d\n", rc);
-		mdelay(1);
+			mdelay(10);
+	
+		rc = camera_sensor_power_enable_8901("8901_lvs3");
+		pr_info("[Camera]sensor_power_enable(\"8901_lvs2\", 1800) == %d\n", rc);
+	} else {
+	/* main / 2nd camera digital power */
+	rc = camera_sensor_power_enable("8058_l8", 1800000);
+	pr_info("[Camera]sensor_power_enable(\"8058_l8\", 1800) == %d\n", rc);
+	mdelay(5);
+	/*IO*/
+	rc = camera_sensor_power_enable("8058_l9", 1800000);
+	pr_info("[Camera]sensor_power_enable(\"8058_l9\", 1800) == %d\n", rc);
+	mdelay(1);
 	}
 	return rc;
 }
 
-static int Shooter_s5k6aafx_vreg_off(void)
+static int Shooter_U_s5k6aafx_vreg_off(void)
 {
 	int rc;
 	pr_info("[Camera]%s\n", __func__);
-	/* IO power off */
-	if(system_rev == 2 && engineerid >= 3){
+
+
+	if(system_rev == 0x80){/*VERSION A*/
 		rc = camera_sensor_power_disable("8901_lvs3");
-		pr_info("[Camera]sensor_power_disable(\"8901_lvs3\") == %d\n", rc);
-		mdelay(1);
-
-		/* main / 2nd camera digital power */
-		rc = camera_sensor_power_disable("8901_lvs2");
-		pr_info("[Camera]sensor_power_disable(\"8901_lvs2\") == %d\n", rc);
-	}else{
-		rc = camera_sensor_power_disable("8058_l9");
-		pr_info("[Camera]sensor_power_disable(\"8058_l9\") == %d\n", rc);
-		mdelay(1);
-
-		/* main / 2nd camera digital power */
-		rc = camera_sensor_power_disable("8058_l8");
-		pr_info("[Camera]sensor_power_disable(\"8058_l8\") == %d\n", rc);
-	}
+		/*This is swich power*/
 	mdelay(1);
+		rc = camera_sensor_power_disable("8901_lvs2");
+		pr_info("[Camera]sensor_power_enable(\"8901_lvs2\", 1800) == %d\n", rc);
+	mdelay(1);
+	} else {
+	/* IO power off */
+	rc = camera_sensor_power_disable("8058_l9");
+	pr_info("[Camera]sensor_power_disable(\"8058_l9\") == %d\n", rc);
+	mdelay(1);
+
+	/* main / 2nd camera digital power */
+	rc = camera_sensor_power_disable("8058_l8");
+	pr_info("[Camera]sensor_power_disable(\"8058_l8\") == %d\n", rc);
+	mdelay(1);
+	}
 	/* main / 2nd camera analog power */
-	rc = camera_sensor_power_disable("8058_l3");
-	pr_info("[Camera]sensor_power_disable(\"8058_l3\") == %d\n", rc);
+	rc = camera_sensor_power_disable("8901_l6");
+	pr_info("[Camera]sensor_power_disable(\"8901_l6\") == %d\n", rc);
+
 	return rc;
 }
 
-static void Shooter_maincam_clk_switch(void)
+#define CLK_SWITCH 141
+static void Shooter_U_maincam_clk_switch(void)
 {
 	pr_info("[Camera]Doing clk switch (Main Cam)\n");
-	gpio_set_value(SHOOTER_CAM_SEL, 0);
+	gpio_set_value(SHOOTER_U_CAM_SEL, 0);
 }
 
-static void Shooter_seccam_clk_switch(void)
+static void Shooter_U_seccam_clk_switch(void)
 {
-	pr_info("[Camera]Doing clk switch (2nd Cam)\n");
-	gpio_set_value(SHOOTER_CAM_SEL, 1);
+	pr_info("Doing clk switch (2nd Cam)\n");
+	gpio_set_value(SHOOTER_U_CAM_SEL, 1);
 }
 #ifdef CONFIG_HTC_BATT8x60
 static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.guage_driver = GUAGE_NONE,
-	.gpio_mbat_in = MSM_GPIO_TO_INT(SHOOTER_GPIO_MBAT_IN),
+	.gpio_mbat_in = MSM_GPIO_TO_INT(SHOOTER_U_GPIO_MBAT_IN),
 	.gpio_mbat_in_trigger_level = MBAT_IN_HIGH_TRIGGER,
 	.charger = SWITCH_CHARGER_TPS65200,
 	.mpp_data = {
@@ -1254,9 +1242,9 @@ static struct platform_device htc_battery_pdev = {
 #endif
 
 #define GPIO_CAM_EN (GPIO_EXPANDER_GPIO_BASE + 13)
-static void shooter_config_camera_on_gpios(void)
+static void shooter_u_config_camera_on_gpios(void)
 {
-	if (engineerid == 7) {
+	if (system_rev == 0x80 && engineerid == 0x1) {
 		config_gpio_table(camera_on_gpio_table_liteon,
 			ARRAY_SIZE(camera_on_gpio_table_liteon));
 	} else {
@@ -1265,25 +1253,26 @@ static void shooter_config_camera_on_gpios(void)
 	}
 }
 
-static void shooter_config_camera_off_gpios(void)
+static void shooter_u_config_camera_off_gpios(void)
 {
-	if (engineerid == 7) {
+	if (system_rev == 0x80 && engineerid == 0x1) {
 		config_gpio_table(camera_off_gpio_table_liteon,
 			ARRAY_SIZE(camera_off_gpio_table_liteon));
 	} else {
 		config_gpio_table(camera_off_gpio_table_sp3d,
 			ARRAY_SIZE(camera_off_gpio_table_sp3d));
 	}
-	shooter_set_gpio(SHOOTER_SP3D_SPI_DO, 0);
-	shooter_set_gpio(SHOOTER_SP3D_SPI_CS, 0);
-	shooter_set_gpio(SHOOTER_SP3D_SPI_CLK, 0);
-	shooter_set_gpio(SHOOTER_SP3D_MCLK, 0);
-	shooter_set_gpio(SHOOTER_CAM_SEL, 0);
+	shooter_u_set_gpio(SHOOTER_U_SP3D_SPI_DO, 0);
+	shooter_u_set_gpio(SHOOTER_U_SP3D_SPI_CS, 0);
+	shooter_u_set_gpio(SHOOTER_U_SP3D_SPI_CLK, 0);
+	shooter_u_set_gpio(SHOOTER_U_SP3D_MCLK, 0);
+	shooter_u_set_gpio(SHOOTER_U_CAM_SEL, 0);
 }
 
+#define GPIO_CAM_EN_WEB_CAM (GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 4)
 static struct msm_camera_device_platform_data msm_camera_device_data = {
-	.camera_gpio_on  = shooter_config_camera_on_gpios,
-	.camera_gpio_off = shooter_config_camera_off_gpios,
+	.camera_gpio_on  = shooter_u_config_camera_on_gpios,
+	.camera_gpio_off = shooter_u_config_camera_off_gpios,
 	.ioext.csiphy = 0x04800000,
 	.ioext.csisz  = 0x00000400,
 	.ioext.csiirq = CSI_0_IRQ,
@@ -1292,8 +1281,8 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 };
 
 static struct msm_camera_device_platform_data msm_camera_device_data_web_cam = {
-	.camera_gpio_on  = shooter_config_camera_on_gpios,
-	.camera_gpio_off = shooter_config_camera_off_gpios,
+	.camera_gpio_on  = shooter_u_config_camera_on_gpios,
+	.camera_gpio_off = shooter_u_config_camera_off_gpios,
 	.ioext.csiphy = 0x04900000,
 	.ioext.csisz  = 0x00000400,
 	.ioext.csiirq = CSI_1_IRQ,
@@ -1315,25 +1304,16 @@ static struct resource msm_camera_resources[] = {
 };
 
 static struct msm_camera_sensor_flash_src msm_flash_src = {
-#if 0
-
-	.flash_sr_type				= MSM_CAMERA_FLASH_SRC_PWM,
-	._fsrc.pwm_src.freq			= 1000,
-	._fsrc.pwm_src.max_load		= 300,
-	._fsrc.pwm_src.low_load		= 30,
-	._fsrc.pwm_src.high_load	= 100,
-	._fsrc.pwm_src.channel		= 7,
-#else
 	.flash_sr_type				= MSM_CAMERA_FLASH_SRC_CURRENT_DRIVER,
 	.camera_flash				= flashlight_control,
-#endif
 };
+
 
 static struct spi_board_info sp3d_spi_board_info[] __initdata = {
 	{
 		.modalias	= "sp3d_spi",
 		.mode		= SPI_MODE_3,
-		.bus_num	= 1,
+		.bus_num	= 2,
 		.chip_select	= 0,
 		.max_speed_hz	= 15060000,
 	}
@@ -1353,9 +1333,9 @@ static struct msm_camera_sensor_flash_data flash_sp3d = {
 static struct msm_camera_sensor_info msm_camera_sensor_sp3d_data = {
 	.sensor_name	= "sp3d",
 	.vcm_enable		= 0,
-	.camera_power_on = Shooter_sp3d_vreg_on,
-	.camera_power_off = Shooter_sp3d_vreg_off,
-	.camera_clk_switch = Shooter_maincam_clk_switch,
+	.camera_power_on = Shooter_U_sp3d_vreg_on,
+	.camera_power_off = Shooter_U_sp3d_vreg_off,
+	.camera_clk_switch = Shooter_U_maincam_clk_switch,
 	.pdata			= &msm_camera_device_data,
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
@@ -1383,11 +1363,11 @@ static struct msm_camera_sensor_flash_data flash_qs_s5k4e1 = {
 
 static struct msm_camera_sensor_info msm_camera_sensor_qs_s5k4e1_data = {
 	.sensor_name	= "qs_s5k4e1",
-	.sensor_reset	= SHOOTER_S5K4E1_PD,
+	.sensor_reset	= SHOOTER_U_S5K4E1_PD,
 	.vcm_enable		= 0,
-	.camera_power_on = Shooter_qs_s5k4e1_vreg_on,
-	.camera_power_off = Shooter_qs_s5k4e1_vreg_off,
-	.camera_clk_switch = Shooter_maincam_clk_switch,
+	.camera_power_on = Shooter_U_qs_s5k4e1_vreg_on,
+	.camera_power_off = Shooter_U_qs_s5k4e1_vreg_off,
+	.camera_clk_switch = Shooter_U_maincam_clk_switch,
 	.pdata			= &msm_camera_device_data,
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
@@ -1412,19 +1392,19 @@ static struct msm_camera_sensor_flash_data flash_s5k6aafx = {
 
 static struct msm_camera_sensor_info msm_camera_sensor_s5k6aafx_data = {
 	.sensor_name	= "s5k6aafx",
-	.sensor_reset	= SHOOTER_WEBCAM_RST,/*2nd Cam RST*/
-	.sensor_pwd		= SHOOTER_WEBCAM_STB,/*2nd Cam PWD*/
+	.sensor_reset	= SHOOTER_U_WEBCAM_RST,/*2nd Cam RST*/
+	.sensor_pwd		= SHOOTER_U_WEBCAM_STB,/*2nd Cam PWD*/
 	.vcm_enable		= 0,
-	.camera_power_on = Shooter_s5k6aafx_vreg_on,
-	.camera_power_off = Shooter_s5k6aafx_vreg_off,
-	.camera_clk_switch = Shooter_seccam_clk_switch,
+	.camera_power_on = Shooter_U_s5k6aafx_vreg_on,
+	.camera_power_off = Shooter_U_s5k6aafx_vreg_off,
+	.camera_clk_switch = Shooter_U_seccam_clk_switch,
 	.pdata			= &msm_camera_device_data_web_cam,
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
 	.flash_data             = &flash_s5k6aafx,
 	.mirror_mode = 0,
 	.csi_if		= 1,
-	.dev_node	= 1,
+	.dev_node	= 1
 };
 
 static void __init msm8x60_init_camera(void)
@@ -1615,7 +1595,7 @@ static T_MHL_PLATFORM_DATA mhl_sii9234_device_data = {
 	.gpio_reset = GPIO_MHL_RST_N,
 	.power = mhl_sii9234_power,
 	#ifdef CONFIG_FB_MSM_HDMI_MHL
-	.mhl_usb_switch		= shooter_mhl_usb_switch,
+	.mhl_usb_switch		= shooter_u_usb_dpdn_switch,
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
 	#endif
 };
@@ -1632,9 +1612,8 @@ static struct i2c_board_info msm_i2c_gsbi7_mhl_sii9234_info[] =
 #endif
 
 static struct tps65200_platform_data tps65200_data = {
-	.charger_check = 1,
-	.gpio_chg_stat = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_CHG_STAT),
-	.gpio_chg_int  = MSM_GPIO_TO_INT(SHOOTER_GPIO_CHG_INT),
+	.gpio_chg_stat = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_U_CHG_STAT),
+	.gpio_chg_int  = MSM_GPIO_TO_INT(SHOOTER_U_GPIO_CHG_INT),
 };
 
 #ifdef CONFIG_SUPPORT_DQ_BATTERY
@@ -1660,23 +1639,23 @@ static struct i2c_board_info msm_tps_65200_boardinfo[] __initdata = {
 #ifdef CONFIG_I2C_QUP
 
 static uint32_t gsbi4_gpio_table[] = {
-	GPIO_CFG(SHOOTER_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SDA, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_CAM_I2C_SCL, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 static uint32_t gsbi5_gpio_table[] = {
-	GPIO_CFG(SHOOTER_TP_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_TP_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_TP_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_TP_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 static uint32_t gsbi7_gpio_table[] = {
-	GPIO_CFG(SHOOTER_GENERAL_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	GPIO_CFG(SHOOTER_GENERAL_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_GENERAL_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SHOOTER_U_GENERAL_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 
 static uint32_t gsbi10_gpio_table[] = {
-	GPIO_CFG(SHOOTER_SENSOR_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIOMUX_DRV_8MA),
-	GPIO_CFG(SHOOTER_SENSOR_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIOMUX_DRV_8MA),
+	GPIO_CFG(SHOOTER_U_SENSOR_I2C_SDA, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIOMUX_DRV_8MA),
+	GPIO_CFG(SHOOTER_U_SENSOR_I2C_SCL, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIOMUX_DRV_8MA),
 };
 
 
@@ -1768,7 +1747,7 @@ static struct msm_spi_platform_data msm_gsbi1_qup_spi_pdata = {
 	.pclk_name = "gsbi_pclk",
 };
 
-static struct msm_spi_platform_data msm_gsbi2_qup_spi_pdata = {
+static struct msm_spi_platform_data msm_gsbi3_qup_spi_pdata = {
 	.max_clock_speed = 15060000,
 	.clk_name = "gsbi_qup_clk",
 	.pclk_name = "gsbi_pclk",
@@ -1830,6 +1809,7 @@ static void __init msm8x60_init_dsps(void)
 }
 #endif /* CONFIG_MSM_DSPS */
 
+#define MSM_OVERLAY_BLT_SIZE   roundup(0x500000, 4096)
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
@@ -1844,7 +1824,6 @@ static void __init msm8x60_init_dsps(void)
 #define MSM_FB_SIZE roundup(0x500000 + MSM_FB_DSUB_PMEM_ADDER, 4096) 
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
-#define MSM_OVERLAY_BLT_SIZE	roundup(0x500000, 4096)
 
 #define MSM_PMEM_ADSP_SIZE         0x2000000
 #define MSM_PMEM_AUDIO_SIZE        0x239000
@@ -1914,19 +1893,19 @@ static struct resource msm_fb_resources[] = {
 	},
 };
 
-static struct platform_device shooter_3Dpanel_device = {
+static struct platform_device shooter_u_3Dpanel_device = {
 	.name = "panel_3d",
 	.id = -1,
 };
 
 #ifdef CONFIG_BT
-static struct platform_device shooter_rfkill = {
-	.name = "shooter_rfkill",
+static struct platform_device shooter_u_rfkill = {
+	.name = "shooter_u_rfkill",
 	.id = -1,
 };
 
 static struct htc_sleep_clk_platform_data htc_slp_clk_data = {
-	.sleep_clk_pin = SHOOTER_WIFI_BT_SLEEP_CLK,
+	.sleep_clk_pin = SHOOTER_U_WIFI_BT_SLEEP_CLK,
 
 };
 
@@ -2106,7 +2085,7 @@ static void __init msm8x60_allocate_memory_regions(void)
 			msm_fb_resources[1].start += 0x10000000;
 	msm_fb_resources[1].end = msm_fb_resources[1].start +
 		MSM_OVERLAY_BLT_SIZE - 1;
-	pr_info("allocating %lu bytes at %p (%lx physical) for "
+	pr_info("allocating %lu bytes at %p (%lx physical) for"
 		"overlay write back\n", (unsigned long)MSM_OVERLAY_BLT_SIZE,
 		__va(msm_fb_resources[1].start),
 		(unsigned long)msm_fb_resources[1].start);
@@ -2205,14 +2184,14 @@ static void __init msm8x60_allocate_memory_regions(void)
 
 #ifdef CONFIG_SERIAL_MSM_HS
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.rx_wakeup_irq = MSM_GPIO_TO_INT(SHOOTER_GPIO_BT_HOST_WAKE),
+	.rx_wakeup_irq = MSM_GPIO_TO_INT(SHOOTER_U_GPIO_BT_HOST_WAKE),
 	.inject_rx_on_wakeup = 0,
-	.cpu_lock_supported = 1,
+	.cpu_lock_supported = 0,
 
 	/* for bcm */
 	.bt_wakeup_pin_supported = 1,
-	.bt_wakeup_pin = SHOOTER_GPIO_BT_CHIP_WAKE,
-	.host_wakeup_pin = SHOOTER_GPIO_BT_HOST_WAKE,
+	.bt_wakeup_pin = SHOOTER_U_GPIO_BT_CHIP_WAKE,
+	.host_wakeup_pin = SHOOTER_U_GPIO_BT_HOST_WAKE,
 };
 #endif
 
@@ -2410,32 +2389,32 @@ static struct regulator_consumer_supply rpm_vreg_supply[RPM_VREG_ID_MAX] = {
 #define FTS_HMIN	RPM_VREG_FTSMPS_HPM_MIN_LOAD
 
 static struct rpm_vreg_pdata rpm_vreg_init_pdata[RPM_VREG_ID_MAX] = {
-	RPM_VREG_INIT_LDO(PM8058_L0,  0, 1, 0, 1200000, 1200000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L1,  0, 1, 0, 1350000, 1350000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L2,  0, 1, 0, 1800000, 2600000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L3,  0, 1, 0, 1800000, 3000000, LDO150HMIN, 0), /* RUIM, 1G:3.0v, 3G:1.8v */
-	RPM_VREG_INIT_LDO(PM8058_L4,  0, 1, 0, 2850000, 2850000,  LDO50HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L5,  0, 1, 0, 2850000, 2850000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L6,  0, 1, 0, 3000000, 3600000,  LDO50HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L7,  0, 1, 0, 1800000, 1800000,  LDO50HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L8,  0, 1, 0, 1800000, 1800000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L9,  0, 1, 0, 1800000, 1800000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L10, 0, 1, 0, 2800000, 2800000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L11, 0, 1, 0, 1800000, 1800000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L12, 0, 1, 0, 3000000, 3200000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L13, 0, 1, 0, 2050000, 2050000, LDO300HMIN, 0),
+	RPM_VREG_INIT_LDO(PM8058_L0,  0, 1, 0, 1200000, 1200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L1,  0, 1, 0, 1350000, 1350000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L2,  0, 1, 0, 1800000, 2600000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L3,  0, 1, 0, 1800000, 3000000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L4,  0, 1, 0, 2850000, 2850000,  LDO50HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L5,  0, 1, 0, 2850000, 2850000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L6,  0, 1, 0, 3000000, 3600000,  LDO50HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L7,  0, 1, 0, 1800000, 1800000,  LDO50HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L8,  0, 1, 0, 1800000, 1800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L9,  0, 1, 0, 1800000, 1800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L10, 0, 1, 0, 2800000, 2800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L11, 0, 1, 0, 2850000, 2850000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L12, 0, 1, 0, 3000000, 3200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L13, 0, 1, 0, 2050000, 2050000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
 	RPM_VREG_INIT_LDO(PM8058_L14, 0, 1, 0, 2850000, 2850000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L15, 0, 1, 0, 2800000, 2800000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L16, 1, 1, 1, 1800000, 1800000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L17, 0, 1, 0, 2600000, 2600000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L18, 0, 1, 1, 2200000, 2200000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L19, 0, 1, 0, 1800000, 1800000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L20, 0, 1, 0, 1800000, 1800000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L21, 1, 1, 0, 1200000, 1200000, LDO150HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8058_L22, 0, 0, 0, 1200000, 1200000, LDO300HMIN, 0), /* On till SB3 on than off */
-	RPM_VREG_INIT_LDO(PM8058_L23, 0, 0, 0, 1200000, 1200000, LDO300HMIN, 0), /* N/A */
-	RPM_VREG_INIT_LDO(PM8058_L24, 0, 1, 0, 1200000, 1200000, LDO150HMIN, 0), /* N/A */
-	RPM_VREG_INIT_LDO(PM8058_L25, 0, 1, 0, 1200000, 1200000, LDO150HMIN, 0), /* N/A */
+	RPM_VREG_INIT_LDO(PM8058_L15, 0, 1, 0, 2800000, 2800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L16, 1, 1, 1, 1800000, 1800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L17, 0, 1, 0, 2600000, 2600000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L18, 0, 1, 1, 2200000, 2200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L19, 0, 1, 0, 1800000, 1800000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L20, 0, 1, 0, 1800000, 1800000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L21, 1, 1, 0, 1200000, 1200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L22, 0, 0, 0, 1200000, 1200000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE), /* On till S4B on than off */
+	RPM_VREG_INIT_LDO(PM8058_L23, 0, 0, 0, 1800000, 1800000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE), /* On till S3A on than off */
+	RPM_VREG_INIT_LDO(PM8058_L24, 0, 1, 0, 1200000, 1200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8058_L25, 0, 1, 0, 1200000, 1200000, LDO150HMIN, RPM_VREG_PIN_CTRL_NONE), /* N/A */
 
 	RPM_VREG_INIT_SMPS(PM8058_S0, 0, 1, 1,  500000, 1250000, SMPS_HMIN, 0,
 		RPM_VREG_FREQ_1p92),
@@ -2453,13 +2432,13 @@ static struct rpm_vreg_pdata rpm_vreg_init_pdata[RPM_VREG_ID_MAX] = {
 
 	RPM_VREG_INIT_NCP(PM8058_NCP, 0, 1, 0, 1800000, 1800000, 0),
 
-	RPM_VREG_INIT_LDO(PM8901_L0,  0, 1, 0, 1200000, 1200000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8901_L1,  0, 1, 0, 3200000, 3200000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8901_L2,  0, 1, 0, 2850000, 3300000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8901_L3,  0, 1, 0, 3300000, 3300000, LDO300HMIN, 0),
+	RPM_VREG_INIT_LDO(PM8901_L0,  0, 1, 0, 1200000, 1200000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8901_L1,  0, 1, 0, 3200000, 3200000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8901_L2,  0, 1, 0, 2850000, 3300000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8901_L3,  0, 1, 0, 3300000, 3300000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
 	RPM_VREG_INIT_LDO(PM8901_L4,  0, 1, 0, 2850000, 2850000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8901_L5,  0, 1, 0, 2850000, 2850000, LDO300HMIN, 0),
-	RPM_VREG_INIT_LDO(PM8901_L6,  0, 0, 0, 2200000, 2200000, LDO300HMIN, 0),
+	RPM_VREG_INIT_LDO(PM8901_L5,  0, 1, 0, 2850000, 2850000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
+	RPM_VREG_INIT_LDO(PM8901_L6,  0, 1, 0, 2850000, 2850000, LDO300HMIN, RPM_VREG_PIN_CTRL_NONE),
 
 	RPM_VREG_INIT_SMPS(PM8901_S2, 0, 1, 0, 1200000, 1200000, FTS_HMIN, 0,
 		RPM_VREG_FREQ_1p60),
@@ -2721,7 +2700,7 @@ static struct platform_device msm_adc_device = {
 
 /* HTC_HEADSET_GPIO Driver */
 static struct htc_headset_gpio_platform_data htc_headset_gpio_data = {
-	.hpin_gpio		= SHOOTER_GPIO_AUD_HP_DET,
+	.hpin_gpio		= SHOOTER_U_GPIO_AUD_HP_DET,
 	.key_enable_gpio	= 0,
 	.mic_select_gpio	= 0,
 };
@@ -2763,7 +2742,7 @@ static struct htc_headset_8x60_platform_data htc_headset_8x60_data = {
 	.adc_remote	= {0, 1251, 1430, 3411, 4543, 6807},
 };
 
-static struct htc_headset_8x60_platform_data htc_headset_8x60_data_xc03 = {
+static struct htc_headset_8x60_platform_data htc_headset_8x60_data_xb = {
 	.adc_mpp	= XOADC_MPP_10,
 	.adc_amux	= PM_MPP_AIN_AMUX_CH5,
 	.adc_mic_bias	= {14375, 26643},
@@ -2822,41 +2801,6 @@ static struct platform_device htc_headset_mgr = {
 	.id	= -1,
 	.dev	= {
 		.platform_data	= &htc_headset_mgr_data,
-	},
-};
-
-static struct pm8058_led_config pm_led_config[] = {
-	{
-		.name = "button-backlight",
-		.type = PM8058_LED_DRVX,
-		.bank = 6,
-		.flags = PM8058_LED_LTU_EN,
-		.period_us = USEC_PER_SEC / 1000,
-		.start_index = 0,
-		.duites_size = 8,
-		.duty_time_ms = 32,
-		.lut_flag = PM_PWM_LUT_RAMP_UP | PM_PWM_LUT_PAUSE_HI_EN,
-		.out_current = 20,
-	},
-	{
-		.name = "amber",
-		.type = PM8058_LED_RGB,
-		.bank = 0,
-		.pwm_size = 9,
-		.clk = PM_PWM_CLK_32KHZ,
-		.pre_div = PM_PWM_PREDIVIDE_2,
-		.pre_div_exp = 1,
-		.pwm_value = 511,
-	},
-	{
-		.name = "green",
-		.type = PM8058_LED_RGB,
-		.bank = 1,
-		.pwm_size = 9,
-		.clk = PM_PWM_CLK_32KHZ,
-		.pre_div = PM_PWM_PREDIVIDE_2,
-		.pre_div_exp = 1,
-		.pwm_value = 511,
 	},
 };
 
@@ -2958,11 +2902,11 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
 	&msm_gsbi1_qup_spi_device,
-	&msm_gsbi2_qup_spi_device,
+	&msm_gsbi3_qup_spi_device,
 #endif
 #ifdef CONFIG_BT
 	&wifi_bt_slp_clk,
-	&shooter_rfkill,
+	&shooter_u_rfkill,
 #endif
 #ifdef CONFIG_SERIAL_MSM_HS
 	&msm_device_uart_dm1,
@@ -3008,7 +2952,7 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
-	&shooter_3Dpanel_device,
+	&shooter_u_3Dpanel_device,
 	&msm_device_kgsl,
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 	&hdmi_msm_device,
@@ -3130,7 +3074,7 @@ static int pm8058_gpios_init(void)
 		},
 #endif
 		{ /* Audio Microphone Selector */
-			SHOOTER_AUD_MIC_SEL,	/* 26 */
+			SHOOTER_U_AUD_MIC_SEL,	/* 26 */
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3143,7 +3087,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* Audio Receiver Amplifier */
-			SHOOTER_AUD_HANDSET_ENO,	/* 17 */
+			SHOOTER_U_AUD_HANDSET_ENO,	/* 17 */
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3156,7 +3100,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* Audio Speaker Amplifier */
-			SHOOTER_AUD_SPK_ENO,	/* 18 */
+			SHOOTER_U_AUD_SPK_ENO,	/* 18 */
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3172,17 +3116,18 @@ static int pm8058_gpios_init(void)
 			20,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
-				.output_value	= 0,
+				.output_value	= 1,
 				.output_buffer	= PM_GPIO_OUT_BUF_CMOS,
-				.pull		= PM_GPIO_PULL_NO,
+				.pull		= PM_GPIO_PULL_DN,
 				.out_strength	= PM_GPIO_STRENGTH_HIGH,
 				.function	= PM_GPIO_FUNC_NORMAL,
 				.vin_sel	= 2,
 				.inv_int_pol	= 0,
 			}
 		},
+		/* FIXME
 		{
-			SHOOTER_PS_VOUT,
+			SHOOTER_U_PLS_INT,
 			{
 				.direction		= PM_GPIO_DIR_IN,
 				.pull			= PM_GPIO_PULL_UP_1P5,
@@ -3190,9 +3135,9 @@ static int pm8058_gpios_init(void)
 				.function		= PM_GPIO_FUNC_NORMAL,
 				.inv_int_pol	= 0,
 			},
-		},
+		},*/
 		{ /* Green LED */
-			SHOOTER_GREEN_LED,
+			SHOOTER_U_GREEN_LED,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 1,
@@ -3205,7 +3150,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* AMBER */
-			SHOOTER_AMBER_LED,
+			SHOOTER_U_AMBER_LED,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 1,
@@ -3217,19 +3162,8 @@ static int pm8058_gpios_init(void)
 				.inv_int_pol	= 0,
 			}
 		},
-		{ /* WIMAX HOST WAKEUP */
-			SHOOTER_WIMAX_HOST_WAKEUP,
-			{
-				.direction	= PM_GPIO_DIR_IN,
-				.output_value	= 0,
-				.pull		= PM_GPIO_PULL_DN,
-				.function	= PM_GPIO_FUNC_NORMAL,
-				.vin_sel	= PM_GPIO_VIN_S3,
-				.inv_int_pol	= 0,
-			}
-		},
 		{ /* 3D CLK */
-			SHOOTER_3DCLK,
+			SHOOTER_U_3DCLK,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3242,7 +3176,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* 3DLCM_PD */
-			SHOOTER_3DLCM_PD,
+			SHOOTER_U_3DLCM_PD,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3255,7 +3189,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* TORCH_SET1 for Flashlight */
-			SHOOTER_TORCH_SET1,
+			SHOOTER_U_TORCH_SET1,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3268,7 +3202,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{ /* TORCH_SET2 for Flashlight */
-			SHOOTER_TORCH_SET2,
+			SHOOTER_U_TORCH_SET2,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3281,7 +3215,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{
-			SHOOTER_AUD_REMO_EN,
+			SHOOTER_U_AUD_REMO_EN,
 			{
 				.direction	= PM_GPIO_DIR_OUT,
 				.output_value	= 0,
@@ -3294,7 +3228,7 @@ static int pm8058_gpios_init(void)
 			}
 		},
 		{
-			SHOOTER_AUD_REMO_PRES,
+			SHOOTER_U_AUD_REMO_PRES,
 			{
 				.direction      = PM_GPIO_DIR_IN,
 				.pull           = PM_GPIO_PULL_NO,
@@ -3306,9 +3240,6 @@ static int pm8058_gpios_init(void)
 	};
 
 	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
-
-		if(gpio_cfgs[i].gpio == SHOOTER_3DLCM_PD && system_rev == 0)
-			continue;
 
 		rc = pm8058_gpio_config(gpio_cfgs[i].gpio,
 				&gpio_cfgs[i].cfg);
@@ -3855,9 +3786,9 @@ static struct i2c_board_info msm_i2c_gsbi7_timpani_info[] = {
 #endif
 
 static struct tpa2051d3_platform_data tpa2051d3_pdata = {
-	.gpio_tpa2051_spk_en = SHOOTER_AUD_SPK_ENO,
+	.gpio_tpa2051_spk_en = SHOOTER_U_AUD_SPK_ENO,
 	.spkr_cmd = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-	.hsed_cmd = {0x00, 0x0C, 0x25, 0x57, 0x6D, 0x4D, 0x0D},
+	.hsed_cmd = {0x00, 0x0C, 0x25, 0x57, 0xCD, 0x4D, 0x0D},
 	.rece_cmd = {0x00, 0x02, 0x25, 0x57, 0x0D, 0x4D, 0x0D},
 };
 
@@ -3870,19 +3801,19 @@ static struct i2c_board_info msm_i2c_gsbi7_tpa2051d3_info[] = {
 	},
 };
 
-static int shooter_ts_atmel_power(int on)
+static int shooter_u_ts_atmel_power(int on)
 {
 	pr_info("%s: power %d\n", __func__, on);
 
-	gpio_set_value(PM8058_GPIO_PM_TO_SYS(SHOOTER_TP_RST), 0);
+	gpio_set_value(PM8058_GPIO_PM_TO_SYS(SHOOTER_U_TP_RST), 0);
 	msleep(5);
-	gpio_set_value(PM8058_GPIO_PM_TO_SYS(SHOOTER_TP_RST), 1);
+	gpio_set_value(PM8058_GPIO_PM_TO_SYS(SHOOTER_U_TP_RST), 1);
 	msleep(40);
 
 	return 0;
 }
 
-struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
+struct atmel_i2c_platform_data shooter_u_ts_atmel_data[] = {
 	{
 		.version = 0x020,
 		.source = 1, /* ALPS, Nissha */
@@ -3894,8 +3825,8 @@ struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
 		.abs_pressure_max = 255,
 		.abs_width_min = 0,
 		.abs_width_max = 20,
-		.gpio_irq = SHOOTER_TP_ATT_N,
-		.power = shooter_ts_atmel_power,
+		.gpio_irq = SHOOTER_U_TP_ATT_N,
+		.power = shooter_u_ts_atmel_power,
 		.unlock_attr = 1,
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {16, 8, 50},
@@ -3928,8 +3859,8 @@ struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
 		.abs_pressure_max = 255,
 		.abs_width_min = 0,
 		.abs_width_max = 20,
-		.gpio_irq = SHOOTER_TP_ATT_N,
-		.power = shooter_ts_atmel_power,
+		.gpio_irq = SHOOTER_U_TP_ATT_N,
+		.power = shooter_u_ts_atmel_power,
 		.unlock_attr = 1,
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {16, 8, 50},
@@ -3962,8 +3893,8 @@ struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
 		.abs_pressure_max = 255,
 		.abs_width_min = 0,
 		.abs_width_max = 20,
-		.gpio_irq = SHOOTER_TP_ATT_N,
-		.power = shooter_ts_atmel_power,
+		.gpio_irq = SHOOTER_U_TP_ATT_N,
+		.power = shooter_u_ts_atmel_power,
 		.unlock_attr = 1,
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {16, 8, 50},
@@ -3993,8 +3924,8 @@ struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
 		.abs_pressure_max = 255,
 		.abs_width_min = 0,
 		.abs_width_max = 20,
-		.gpio_irq = SHOOTER_TP_ATT_N,
-		.power = shooter_ts_atmel_power,
+		.gpio_irq = SHOOTER_U_TP_ATT_N,
+		.power = shooter_u_ts_atmel_power,
 		.unlock_attr = 1,
 		.config_T6 = {0, 0, 0, 0, 0, 0},
 		.config_T7 = {16, 8, 50},
@@ -4018,8 +3949,8 @@ struct atmel_i2c_platform_data shooter_ts_atmel_data[] = {
 static struct i2c_board_info msm_i2c_gsbi5_info[] = {
 	{
 		I2C_BOARD_INFO(ATMEL_QT602240_NAME, 0x94 >> 1),
-		.platform_data = &shooter_ts_atmel_data,
-		.irq = MSM_GPIO_TO_INT(SHOOTER_TP_ATT_N)
+		.platform_data = &shooter_u_ts_atmel_data,
+		.irq = MSM_GPIO_TO_INT(SHOOTER_U_TP_ATT_N)
 	},
 };
 
@@ -4197,7 +4128,7 @@ static struct i2c_board_info pm8901_boardinfo[] __initdata = {
 #endif /*CONFIG_MSM8X60_SSBI*/
 #endif /* CONFIG_PMIC8901 */
 /*
-static int config_shooter_proximity_gpios(int on)
+static int config_shooter_u_proximity_gpios(int on)
 {
 	int ret;
 
@@ -4216,7 +4147,7 @@ static int config_shooter_proximity_gpios(int on)
 	else
 		proximity_INT_gpio_cfg.pull = PM_GPIO_PULL_DN;
 
-	ret = pm8058_gpio_config(SHOOTER_PS_VOUT, &proximity_INT_gpio_cfg);
+	ret = pm8058_gpio_config(SHOOTER_U_PS_VOUT, &proximity_INT_gpio_cfg);
 	if (ret)
 		pr_err("%s PMIC GPIO P-sensor interrupt write failed\n",
 			__func__);
@@ -4249,7 +4180,7 @@ static int __isl29028_power(int on)
 	}
 
 	if (on) {
-		config_shooter_proximity_gpios(1);
+		config_shooter_u_proximity_gpios(1);
 		if (regulator_enable(reg_8901_l4)) {
 			pr_err("%s: Unable to enable the regulator:"
 					" reg_8901_l4\n", __func__);
@@ -4261,7 +4192,7 @@ static int __isl29028_power(int on)
 					" reg_8901_l4\n", __func__);
 			return -1;
 		}
-		config_shooter_proximity_gpios(0);
+		config_shooter_u_proximity_gpios(0);
 	}
 
 	printk(KERN_DEBUG "%s: Turn the isl29028 power %s\n",
@@ -4303,7 +4234,7 @@ static int isl29028_power(int pwr_device, uint8_t enable)
 }
 
 static struct isl29028_platform_data isl29028_pdata = {
-	.intr = PM8058_GPIO_PM_TO_SYS(SHOOTER_PS_VOUT),
+	.intr = PM8058_GPIO_PM_TO_SYS(SHOOTER_U_PS_VOUT),
 	.levels = {17, 79, 258, 588, 918, 1250, 1962, 2673, 3384, 4095},
 	.golden_adc = 0x4E2,
 	.power = isl29028_power,
@@ -4315,7 +4246,7 @@ static struct i2c_board_info i2c_isl29028_devices[] = {
 	{
 		I2C_BOARD_INFO(ISL29028_I2C_NAME, 0x8A >> 1),
 		.platform_data = &isl29028_pdata,
-		.irq = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_PS_VOUT),
+		.irq = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_U_PS_VOUT),
 	},
 };
 
@@ -4325,7 +4256,7 @@ static int isl29029_power(int pwr_device, uint8_t enable)
 }
 
 static struct isl29029_platform_data isl29029_pdata = {
-	.intr = PM8058_GPIO_PM_TO_SYS(SHOOTER_PS_VOUT),
+	.intr = PM8058_GPIO_PM_TO_SYS(SHOOTER_U_PS_VOUT),
 	.levels = {17, 79, 258, 588, 918, 1250, 1962, 2673, 3384, 4095},
 	.golden_adc = 0x4E2,
 	.power = isl29029_power,
@@ -4337,7 +4268,7 @@ static struct i2c_board_info i2c_isl29029_devices[] = {
 	{
 		I2C_BOARD_INFO(ISL29029_I2C_NAME, 0x8A >> 1),
 		.platform_data = &isl29029_pdata,
-		.irq = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_PS_VOUT),
+		.irq = PM8058_GPIO_IRQ(PM8058_IRQ_BASE, SHOOTER_U_PS_VOUT),
 	},
 };
 
@@ -4364,56 +4295,22 @@ static struct mpu3050_platform_data mpu3050_data = {
 		.adapt_num = 5, /* The i2c bus to which the mpu device is connected */
 		.bus = EXT_SLAVE_BUS_PRIMARY,
 		.address = 0x1A >> 1,
-			.orientation = { 1, 0, 0,
-							0, 1, 0,
-							0, 0, 1 },
-	},
-};
-
-static struct mpu3050_platform_data mpu3050_data_XC = {
-	.int_config = 0x10,
-	.orientation = { -1, 0, 0,
-					0, 1, 0,
-					0, 0, -1 },
-	.level_shifter = 0,
-
-	.accel = {
-		.get_slave_descr = get_accel_slave_descr,
-		.adapt_num = 5, /* The i2c bus to which the mpu device is connected */
-		.bus = EXT_SLAVE_BUS_SECONDARY,
-		.address = 0x30 >> 1,
 			.orientation = { -1, 0, 0,
 							0, 1, 0,
 							0, 0, -1 },
 
 	},
-
-	.compass = {
-		.get_slave_descr = get_compass_slave_descr,
-		.adapt_num = 5, /* The i2c bus to which the mpu device is connected */
-		.bus = EXT_SLAVE_BUS_PRIMARY,
-		.address = 0x1A >> 1,
-			.orientation = { -1, 0, 0,
-							0, 1, 0,
-							0, 0, -1 },
-	},
 };
+
 
 static struct i2c_board_info __initdata mpu3050_GSBI10_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("mpu3050", 0xD0 >> 1),
-		.irq = MSM_GPIO_TO_INT(SHOOTER_GYRO_INT),
+		.irq = MSM_GPIO_TO_INT(SHOOTER_U_GYRO_INT),
 		.platform_data = &mpu3050_data,
 	},
 };
 
-static struct i2c_board_info __initdata mpu3050_GSBI10_boardinfo_XC[] = {
-	{
-		I2C_BOARD_INFO("mpu3050", 0xD0 >> 1),
-		.irq = MSM_GPIO_TO_INT(SHOOTER_GYRO_INT),
-		.platform_data = &mpu3050_data_XC,
-	},
-};
 
 #ifdef CONFIG_I2C
 #define I2C_SURF 1
@@ -4477,13 +4374,13 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 	},
 #endif
 #endif
-#if 0
 	{
 		I2C_SURF | I2C_FFA,
 		MSM_GSBI5_QUP_I2C_BUS_ID,
 		msm_i2c_gsbi5_info,
 		ARRAY_SIZE(msm_i2c_gsbi5_info),
 	},
+#if 0
 	{
 		I2C_SURF | I2C_FFA,
 		MSM_GSBI10_QUP_I2C_BUS_ID,
@@ -4516,7 +4413,7 @@ static void register_i2c_devices(void)
 	int i;
 
 	/* Build the matching 'supported_machs' bitmask */
-	if (machine_is_shooter())
+	if (machine_is_shooter_u())
 		mach_mask = I2C_SURF;
 	else
 		pr_err("unmatched machine ID in register_i2c_devices\n");
@@ -4531,25 +4428,8 @@ static void register_i2c_devices(void)
 						msm8x60_i2c_devices[i].len);
 	}
 
-	if (system_rev >= 2) {
-		struct atmel_i2c_platform_data *pdata;
-
-		pdata = msm_i2c_gsbi5_info[0].platform_data;
-		pdata[0].gpio_irq = SHOOTER_TP_ATT_N_XC;
-		pdata[1].gpio_irq = SHOOTER_TP_ATT_N_XC;
-		msm_i2c_gsbi5_info[0].irq = MSM_GPIO_TO_INT(SHOOTER_TP_ATT_N_XC);
-
-		i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
-			mpu3050_GSBI10_boardinfo_XC, ARRAY_SIZE(mpu3050_GSBI10_boardinfo_XC));
-	} else {
-		i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
-			mpu3050_GSBI10_boardinfo, ARRAY_SIZE(mpu3050_GSBI10_boardinfo));
-	}
-
-	i2c_register_board_info(MSM_GSBI5_QUP_I2C_BUS_ID,
-		msm_i2c_gsbi5_info, ARRAY_SIZE(msm_i2c_gsbi5_info));
-
-
+	i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
+		mpu3050_GSBI10_boardinfo, ARRAY_SIZE(mpu3050_GSBI10_boardinfo));
 #endif
 }
 
@@ -4563,7 +4443,7 @@ static void __init msm8x60_init_buses(void)
 #endif
 #if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
 	msm_gsbi1_qup_spi_device.dev.platform_data = &msm_gsbi1_qup_spi_pdata;
-	msm_gsbi2_qup_spi_device.dev.platform_data = &msm_gsbi2_qup_spi_pdata;
+	msm_gsbi3_qup_spi_device.dev.platform_data = &msm_gsbi3_qup_spi_pdata;
 #endif
 #ifdef CONFIG_MSM8X60_SSBI
 	msm_device_ssbi1.dev.platform_data = &msm_ssbi1_pdata;
@@ -4582,7 +4462,7 @@ static void __init msm8x60_init_buses(void)
 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
 #endif
 #ifdef CONFIG_SERIAL_MSM_HS
-	msm_uart_dm1_pdata.rx_wakeup_irq = gpio_to_irq(SHOOTER_GPIO_BT_HOST_WAKE);
+	msm_uart_dm1_pdata.rx_wakeup_irq = gpio_to_irq(SHOOTER_U_GPIO_BT_HOST_WAKE);
 	msm_device_uart_dm1.name = "msm_serial_hs_brcm"; /* for brcm */
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 #endif
@@ -4606,12 +4486,31 @@ static void __init msm8x60_init_buses(void)
 
 }
 
-static void __init shooter_map_io(void)
+static void __init shooter_u_map_io(void)
 {
 	msm_shared_ram_phys = MSM_SHARED_RAM_PHYS;
 	msm_map_msm8x60_io();
 	msm8x60_allocate_memory_regions();
 }
+
+#if 0
+static uint32_t msm8x60_tlmm_cfgs[] = {
+#ifdef CONFIG_PMIC8058
+	/* PMIC8058 */
+	GPIO_CFG(PM8058_GPIO_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+#endif
+
+#ifdef CONFIG_PMIC8901
+	/* PMIC8901 */
+	GPIO_CFG(PM8901_GPIO_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+#endif
+
+	/* UARTDM_RX */
+	GPIO_CFG(117, 2, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	/* UARTDM_TX */
+	GPIO_CFG(118, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+};
+#endif
 
 static void __init msm8x60_init_tlmm(void)
 {
@@ -4645,7 +4544,6 @@ static struct msm_sdcc_gpio sdc1_gpio_cfg[] = {
 	{167, "sdc1_clk"},
 	{168, "sdc1_cmd"}
 };
-
 static uint32_t sdc1_on_gpio_table[] = {
 	GPIO_CFG(159, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA), /* DAT0 */
 	GPIO_CFG(160, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA), /* DAT1 */
@@ -4660,7 +4558,6 @@ static uint32_t sdc1_on_gpio_table[] = {
 	GPIO_CFG(167, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA), /* CLK */
 	GPIO_CFG(168, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA), /* CMD */
 };
-
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
@@ -4703,7 +4600,7 @@ struct msm_sdcc_pad_drv_cfg {
 
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
 static struct msm_sdcc_pad_drv_cfg sdc3_pad_on_drv_cfg[] = {
-	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_10MA},
+	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_8MA},
 	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_8MA},
 	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_8MA}
 };
@@ -5001,12 +4898,14 @@ vdd_reg_put:
 out:
 	return rc;
 }
+
 static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 {
 	int rc = 0;
 	struct sdcc_reg *curr_vdd_reg;
 	struct sdcc_reg *curr_vccq_reg;
 	struct sdcc_reg_data *curr;
+
 	curr = &sdcc_vreg_data[dev_id - 1];
 	curr_vdd_reg = curr->vdd_data;
 	curr_vccq_reg = curr->vccq_data;
@@ -5027,8 +4926,6 @@ static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 		goto out;
 
 	if (enable) {
-		if(dev_id == 3)
-			printk(KERN_INFO "%s: Enabling SD slot power\n", __func__);
 		if (curr_vdd_reg) {
 			mdelay(5);
 			rc = regulator_enable(curr_vdd_reg->reg);
@@ -5055,8 +4952,6 @@ static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 		 */
 		curr->sts = enable;
 	} else {
-		if(dev_id == 3)
-			printk(KERN_INFO "%s: Disabling SD slot power\n", __func__);
 		if (curr_vdd_reg) {
 			rc = regulator_disable(curr_vdd_reg->reg);
 			if (rc) {
@@ -5098,6 +4993,7 @@ static u32 msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 	struct msm_sdcc_pin_cfg *curr_pin_cfg;
 
 	pdev = container_of(dv, struct platform_device, dev);
+
 	/* setup gpio/pad */
 	curr_pin_cfg = &sdcc_pin_cfg_data[pdev->id - 1];
 	if (curr_pin_cfg->cfg_sts == !!vdd)
@@ -5163,7 +5059,7 @@ static unsigned int msm8x60_sdcc_slot_status(struct device *dev)
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-static unsigned int shooter_emmcslot_type = MMC_TYPE_MMC;
+static unsigned int shooteru_emmcslot_type = MMC_TYPE_MMC;
 static struct mmc_platform_data msm8x60_sdc1_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 #ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
@@ -5171,7 +5067,7 @@ static struct mmc_platform_data msm8x60_sdc1_data = {
 #else
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #endif
-	.slot_type		= &shooter_emmcslot_type,
+	.slot_type		= &shooteru_emmcslot_type,
 	.msmsdcc_fmin	= 400000,
 	.msmsdcc_fmid	= 24000000,
 	.msmsdcc_fmax	= 48000000,
@@ -5195,7 +5091,7 @@ static struct mmc_platform_data msm8x60_sdc2_data = {
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-static unsigned int shooter_sdslot_type = MMC_TYPE_SD;
+static unsigned int shooteru_sdslot_type = MMC_TYPE_SD;
 static struct mmc_platform_data msm8x60_sdc3_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
@@ -5207,7 +5103,7 @@ static struct mmc_platform_data msm8x60_sdc3_data = {
 				       PMIC_GPIO_SDC3_DET - 1),
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
-	.slot_type		= &shooter_sdslot_type,
+	.slot_type		= &shooteru_sdslot_type,
 	.msmsdcc_fmin	= 144000,
 	.msmsdcc_fmid	= 24000000,
 	.msmsdcc_fmax	= 48000000,
@@ -5268,7 +5164,7 @@ static void __init msm8x60_init_mmc(void)
 	sdcc_vreg_data[1].vccq_data = NULL;
 	msm_add_sdcc(2, &msm8x60_sdc2_data); 
 */	 
-	// Follow up in  shooter_init_mmc()
+	// Follow up in  shooter_u_init_mmc()
 	 
 #endif
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
@@ -5288,7 +5184,7 @@ static void __init msm8x60_init_mmc(void)
 	sdcc_vreg_data[3].vdd_data->level = 1800000;
 	sdcc_vreg_data[3].vccq_data = NULL;
 	msm_add_sdcc(4, &msm8x60_sdc4_data);*/
-	ret = shooter_init_mmc();
+	ret = shooter_u_init_mmc();
 	if (ret != 0)
 		pr_crit("%s: Unable to initialize MMC (SDCC4)\n", __func__);
 #endif
@@ -5412,10 +5308,10 @@ static int hdmi_cec_power(int on)
 
 #ifdef CONFIG_MSM8X60_AUDIO
 static uint32_t msm_spi_gpio[] = {
-	GPIO_CFG(SHOOTER_SPI_DO,  0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SPI_DI,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SPI_CS,  0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(SHOOTER_SPI_CLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SPI_DO,  0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SPI_DI,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SPI_CS,  0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(SHOOTER_U_SPI_CLK, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t auxpcm_gpio_table[] = {
@@ -5461,40 +5357,32 @@ static struct msm_rpm_platform_data msm_rpm_data = {
 };
 #endif
 
-static ssize_t shooter_virtual_keys_show(struct kobject *kobj,
+static ssize_t shooter_u_virtual_keys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
-	if (system_rev < 2) /* XA, XB */
-		return sprintf(buf,
-			__stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":70:1040:70:80"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":190:1040:76:80"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":345:1040:80:80"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":468:1040:70:80"
-			"\n");
-	else /* XC */
-		return sprintf(buf,
-			__stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":70:1020:90:90"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":190:1020:100:90"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":345:1020:100:90"
-			":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":468:1020:90:90"
-			"\n");
+	return sprintf(buf,
+		__stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":70:1020:90:90"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":190:1020:100:90"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":345:1020:100:90"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":468:1020:90:90"
+		"\n");
 }
 
-static struct kobj_attribute shooter_virtual_keys_attr = {
+static struct kobj_attribute shooter_u_virtual_keys_attr = {
 	.attr = {
 		.name = "virtualkeys.atmel-touchscreen",
 		.mode = S_IRUGO,
 	},
-	.show = &shooter_virtual_keys_show,
+	.show = &shooter_u_virtual_keys_show,
 };
 
-static struct attribute *shooter_properties_attrs[] = {
-	&shooter_virtual_keys_attr.attr,
+static struct attribute *shooter_u_properties_attrs[] = {
+	&shooter_u_virtual_keys_attr.attr,
 	NULL
 };
 
-static struct attribute_group shooter_properties_attr_group = {
-	.attrs = shooter_properties_attrs,
+static struct attribute_group shooter_u_properties_attr_group = {
+	.attrs = shooter_u_properties_attrs,
 };
 
 void msm_snddev_rx_route_config(void)
@@ -5507,14 +5395,14 @@ void msm_snddev_rx_route_deconfig(void)
 	pr_debug("%s\n", __func__);
 }
 #ifdef CONFIG_USB_ANDROID
-static void shooter_add_usb_devices(void)
+static void shooter_u_add_usb_devices(void)
 {
 	printk("%s\n", __func__);
 	android_usb_pdata.products[0].product_id =
 		android_usb_pdata.product_id;
 
 #if defined(CONFIG_USB_OTG)
-	msm_otg_pdata.idgnd_gpio = SHOOTER_GPIO_USB_ID;
+	msm_otg_pdata.idgnd_gpio = SHOOTER_U_GPIO_USB_ID;
 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
 	msm_device_hsusb_host.dev.platform_data = &msm_usb_host_pdata;
 
@@ -5526,15 +5414,16 @@ static void shooter_add_usb_devices(void)
 	platform_device_register(&usb_mass_storage_device);
 	platform_device_register(&android_usb_device);
 
-	config_shooter_usb_uart_gpios(0);
-	config_shooter_usb_id_gpios(0);
-	config_shooter_mhl_gpios();
+	config_shooter_u_usb_uart_gpios(0);
+	config_shooter_u_usb_id_gpios(0);
+	config_shooter_u_mhl_gpios();
 
-	shooter_mhl_usb_switch(0);
+	config_gpio_table(mhl_usb_switch_table, ARRAY_SIZE(mhl_usb_switch_table));
 
-	/*XC HW has auto switch of usb/uart*/
-	if (system_rev > 1)
-		config_gpio_table(usb_uart_input_pulldown_switch_table, ARRAY_SIZE(usb_uart_input_pulldown_switch_table));
+	gpio_set_value(SHOOTER_U_GPIO_MHL_USB_SW, 0);
+
+	/*HW has auto switch of usb/uart*/
+	config_gpio_table(usb_uart_input_pulldown_switch_table, ARRAY_SIZE(usb_uart_input_pulldown_switch_table));
 }
 #endif
 
@@ -5548,6 +5437,8 @@ unsigned __initdata irq_num_ignore_tbl = ARRAY_SIZE(irq_ignore_tbl);
 int __initdata clk_ignore_tbl[] =
 {
 	L_GSBI12_UART_CLK,
+	L_SDC4_CLK,
+	L_SDC4_P_CLK,
 };
 
 unsigned __initdata clk_num_ignore_tbl = ARRAY_SIZE(clk_ignore_tbl);
@@ -5558,18 +5449,18 @@ unsigned __initdata clk_num_ignore_tbl = ARRAY_SIZE(clk_ignore_tbl);
 uint32_t __initdata regulator_lpm_set[] =
 {
 	PM8058_LPM_SET(PM8058_L0) | PM8058_LPM_SET(PM8058_L1) | PM8058_LPM_SET(PM8058_L2) |
-	PM8058_LPM_SET(PM8058_L3) | PM8058_LPM_SET(PM8058_L5) | PM8058_LPM_SET(PM8058_L6) |
-	PM8058_LPM_SET(PM8058_L7) | PM8058_LPM_SET(PM8058_L8) | PM8058_LPM_SET(PM8058_L9) |
-	PM8058_LPM_SET(PM8058_L10) | PM8058_LPM_SET(PM8058_L11) | PM8058_LPM_SET(PM8058_L13) |
+	PM8058_LPM_SET(PM8058_L5) | PM8058_LPM_SET(PM8058_L6) | PM8058_LPM_SET(PM8058_L7) |
+	PM8058_LPM_SET(PM8058_L8) | PM8058_LPM_SET(PM8058_L9) | PM8058_LPM_SET(PM8058_L10) |
+	PM8058_LPM_SET(PM8058_L11) | PM8058_LPM_SET(PM8058_L13) |
 	PM8058_LPM_SET(PM8058_L15) | PM8058_LPM_SET(PM8058_L16) | PM8058_LPM_SET(PM8058_L17) |
 	PM8058_LPM_SET(PM8058_L18) | PM8058_LPM_SET(PM8058_L19) | PM8058_LPM_SET(PM8058_L20) |
 	PM8058_LPM_SET(PM8058_L21) | PM8058_LPM_SET(PM8058_L22) | PM8058_LPM_SET(PM8058_L23) |
 	PM8058_LPM_SET(PM8058_L24) | PM8058_LPM_SET(PM8058_L25),
-	PM8901_LPM_SET(PM8901_L0) | PM8901_LPM_SET(PM8901_L1) | PM8901_LPM_SET(PM8901_L2) |
-	PM8901_LPM_SET(PM8901_L3) | PM8901_LPM_SET(PM8901_L5),
+	PM8901_LPM_SET(PM8901_L0) | PM8901_LPM_SET(PM8901_L2) | PM8901_LPM_SET(PM8901_L3) |
+	PM8901_LPM_SET(PM8901_L5) | PM8901_LPM_SET(PM8901_L6),
 };
 
-static void __init shooter_init(void)
+static void __init shooter_u_init(void)
 {
 	int rc = 0;
 	struct kobject *properties_kobj;
@@ -5586,7 +5477,7 @@ static void __init shooter_init(void)
 	if (msm_xo_init())
 		pr_err("Failed to initialize XO votes\n");
 
-	pr_err("shooter_init, system_rev = %d\n", system_rev);
+	pr_err("shooter_u_init, system_rev = %d\n", system_rev);
 
 	if (socinfo_init() < 0)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
@@ -5620,10 +5511,10 @@ static void __init shooter_init(void)
 
 	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
 
-	#ifdef CONFIG_SP3D
+
 	spi_register_board_info(sp3d_spi_board_info,
 			ARRAY_SIZE(sp3d_spi_board_info));
-	#endif
+
 
 	/* Buses need to be initialized before early-device registration
 	 * to get the platform data for fabrics.
@@ -5639,7 +5530,7 @@ static void __init shooter_init(void)
 	msm_acpu_clock_init(&msm8x60_acpu_clock_data);
 
 #ifdef CONFIG_PERFLOCK
-	perflock_init(&shooter_perflock_data);
+	perflock_init(&shooter_u_perflock_data);
 #endif
 
 	msm8x60_init_tlmm();
@@ -5656,22 +5547,22 @@ static void __init shooter_init(void)
 	msm8x60_init_camera();
 
 	/* Accessory */
-	printk(KERN_INFO "[HS_BOARD] (%s) system_rev = %d, engineerid = %d\n",
-	       __func__, system_rev, engineerid);
-	if ((system_rev == 2 && engineerid >= 1) || system_rev > 2) {
+	printk(KERN_INFO "[HS_BOARD] (%s) system_rev = %d\n", __func__,
+	       system_rev);
+	if (system_rev >= 1) {
 		htc_headset_pmic_data.key_gpio =
-			PM8058_GPIO_PM_TO_SYS(SHOOTER_AUD_REMO_PRES);
+			PM8058_GPIO_PM_TO_SYS(SHOOTER_U_AUD_REMO_PRES);
 		htc_headset_pmic_data.key_enable_gpio =
-			PM8058_GPIO_PM_TO_SYS(SHOOTER_AUD_REMO_EN);
+			PM8058_GPIO_PM_TO_SYS(SHOOTER_U_AUD_REMO_EN);
 		htc_headset_8x60.dev.platform_data =
-			&htc_headset_8x60_data_xc03;
+			&htc_headset_8x60_data_xb;
 		htc_headset_mgr_data.headset_config_num =
 			ARRAY_SIZE(htc_headset_mgr_config);
 		htc_headset_mgr_data.headset_config = htc_headset_mgr_config;
 		printk(KERN_INFO "[HS_BOARD] (%s) Set MEMS config\n", __func__);
 	}
 
-	if (machine_is_shooter()) {
+	if (machine_is_shooter_u()) {
 		platform_add_devices(surf_devices,
 				     ARRAY_SIZE(surf_devices));
 
@@ -5680,16 +5571,10 @@ static void __init shooter_init(void)
 #endif
 	}
 #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
-	if (system_rev >= 1)
-		mhl_sii9234_device_data.ci2ca = 0;
-	else
-		mhl_sii9234_device_data.ci2ca = 1;
+	mhl_sii9234_device_data.ci2ca = 0;
 #endif
 
-	if (system_rev == XB)
-		cable_detect_pdata.mhl_version_ctrl_flag = true;
-
-	shooter_init_panel(msm_fb_resources, ARRAY_SIZE(msm_fb_resources));
+	shooter_u_init_panel(msm_fb_resources, ARRAY_SIZE(msm_fb_resources));
 	register_i2c_devices();
 
 	if (ps_type == 1) {
@@ -5704,9 +5589,7 @@ static void __init shooter_init(void)
 		printk(KERN_DEBUG "No Intersil chips\n");
 
 #ifdef CONFIG_USB_ANDROID
-	/*usb driver won't be loaded in MFG 58 station*/
-	if (board_mfg_mode() != 6)
-		shooter_add_usb_devices();
+	shooter_u_add_usb_devices();
 #endif
 
 	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
@@ -5723,25 +5606,20 @@ static void __init shooter_init(void)
 	gpio_tlmm_config(msm_spi_gpio[2], GPIO_CFG_DISABLE);
 	gpio_tlmm_config(msm_spi_gpio[3], GPIO_CFG_DISABLE);
 
-	shooter_audio_init();
+	shooter_u_audio_init();
 #endif
-	shooter_init_keypad();
+	shooter_u_init_keypad();
 
 	properties_kobj = kobject_create_and_add("board_properties", NULL);
 	if (properties_kobj)
 		rc = sysfs_create_group(properties_kobj,
-				&shooter_properties_attr_group);
+				&shooter_u_properties_attr_group);
 	if (!properties_kobj || rc)
 		pr_err("failed to create board_properties\n");
 
-	shooter_wifi_init();
+	shooter_u_wifi_init();
 
-	if (system_rev == 0) {
-		pm8058_leds_data.led_config = pm_led_config;
-		pm8058_leds_data.num_leds = ARRAY_SIZE(pm_led_config);
-	}
-
-	sysinfo_proc_init();
+	create_proc_read_entry("emmc", 0, NULL, emmc_partition_read_proc, NULL);
 
 	msm_mpm_set_irq_ignore_list(irq_ignore_tbl, irq_num_ignore_tbl);
 	msm_clk_soc_set_ignore_list(clk_ignore_tbl, clk_num_ignore_tbl);
@@ -5750,7 +5628,7 @@ static void __init shooter_init(void)
 #define PHY_BASE_ADDR1	0x48000000
 #define SIZE_ADDR1	0x23800000
 
-static void __init shooter_fixup(struct machine_desc *desc, struct tag *tags,
+static void __init shooter_u_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
 	mem_size_mb = parse_tag_memsize((const struct tag *)tags);
@@ -5764,15 +5642,15 @@ static void __init shooter_fixup(struct machine_desc *desc, struct tag *tags,
 		mi->bank[0].size += 0x10000000;
 }
 
-MACHINE_START(SHOOTER, "shooter")
+MACHINE_START(SHOOTER_U, "shooter_u")
 #ifdef CONFIG_MSM_DEBUG_UART
 	.phys_io = MSM_DEBUG_UART_PHYS,
 	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
-	.fixup = shooter_fixup,
-	.map_io = shooter_map_io,
+	.fixup = shooter_u_fixup,
+	.map_io = shooter_u_map_io,
 	.init_irq = msm8x60_init_irq,
-	.init_machine = shooter_init,
+	.init_machine = shooter_u_init,
 	.timer = &msm_timer,
 MACHINE_END
 

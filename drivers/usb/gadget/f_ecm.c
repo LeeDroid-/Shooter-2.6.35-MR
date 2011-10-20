@@ -484,12 +484,13 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (ecm->notify->driver_data) {
 			VDBG(cdev, "reset ecm control %d\n", intf);
 			usb_ep_disable(ecm->notify);
-		} else {
+		} else
 			VDBG(cdev, "init ecm ctrl %d\n", intf);
+
+		if (!ecm->notify_desc)
 			ecm->notify_desc = ep_choose(cdev->gadget,
 					ecm->hs.notify,
 					ecm->fs.notify);
-		}
 		usb_ep_enable(ecm->notify, ecm->notify_desc);
 		ecm->notify->driver_data = ecm;
 
@@ -771,6 +772,21 @@ ecm_unbind(struct usb_configuration *c, struct usb_function *f)
 	kfree(ecm);
 }
 
+static void
+ecm_release(struct usb_configuration *c, struct usb_function *f)
+{
+	struct f_ecm		*ecm = func_to_ecm(f);
+
+	DBG(c->cdev, "ecm unbind\n");
+
+	if (gadget_is_dualspeed(c->cdev->gadget))
+		usb_free_descriptors(f->hs_descriptors);
+	usb_free_descriptors(f->descriptors);
+
+	kfree(ecm->notify_req->buf);
+	usb_ep_free_request(ecm->notify, ecm->notify_req);
+}
+
 /**
  * ecm_bind_config - add CDC Ethernet network link to a configuration
  * @c: the configuration to support the network link
@@ -840,6 +856,7 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	ecm->port.func.get_alt = ecm_get_alt;
 	ecm->port.func.setup = ecm_setup;
 	ecm->port.func.disable = ecm_disable;
+	ecm->port.func.release = ecm_release;
 	ecm->port.func.hidden = 1;
 
 	status = usb_add_function(c, &ecm->port.func);

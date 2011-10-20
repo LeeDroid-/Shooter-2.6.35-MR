@@ -556,7 +556,7 @@ static int __devinit tsens_tm_probe(struct platform_device *pdev)
 		tmdev->sensor[i].mode = THERMAL_DEVICE_ENABLED;
 		tmdev->sensor[i].tz_dev = thermal_zone_device_register(name,
 				TSENS_TRIP_NUM, &tmdev->sensor[i],
-				&tsens_thermal_zone_ops, 0, 0, 0, 0);
+				&tsens_thermal_zone_ops, 0, 0, 0, 60000);
 		if (tmdev->sensor[i].tz_dev == NULL) {
 			pr_err("%s: thermal_zone_device_register() failed.\n",
 			__func__);

@@ -1056,20 +1056,19 @@ void diag_smd_enable(smd_channel_t *ch, char *src, int mode)
 			r = smd_open(SMDDIAG_NAME, &driver->ch, driver, diag_smd_notify);
 			if (!r)
 				_ch = driver->ch;
-				DIAGFWD_INFO("_ch=%x: driver->ch=%xn", (unsigned int)_ch, (unsigned int)driver->ch);
-		}
+		} else
+			_ch = driver->ch;
 	} else {
 		if (driver->ch) {
 			r = smd_close(driver->ch);
 			driver->ch = NULL;
 			if (!r)
 				_ch = driver->ch;
-				DIAGFWD_INFO("_ch=%x: driver->ch=%xn", (unsigned int)_ch, (unsigned int)driver->ch);
 		}
 	}
 	ch = _ch;
 	mutex_unlock(&driver->smd_lock);
-	DIAGFWD_INFO("smd_try_open(%s): r=%d _ch=%x\n", src, r, (unsigned int)_ch);
+	DIAGFWD_INFO("smd_try_open(%s): r=%d _ch=%x\n", src, r, (unsigned int)ch);
 }
 static int diag_smd_probe(struct platform_device *pdev)
 {

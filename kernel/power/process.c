@@ -17,7 +17,6 @@
 #include <linux/delay.h>
 #include <linux/wakelock.h>
 #include "power.h"
-
 #ifdef CONFIG_MSM_WATCHDOG
 extern int msm_watchdog_suspend(void);
 extern int msm_watchdog_resume(void);

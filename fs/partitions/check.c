@@ -597,6 +597,13 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	struct hd_struct *part;
 	int p, highest, res;
 rescan:
+/* Alloc once, not free */
+/*
+	if (state && !IS_ERR(state)) {
+		vfree(state);
+		state = NULL;
+	}
+*/
 	if (bdev->bd_part_count)
 		return -EBUSY;
 	res = invalidate_partition(disk, 0);

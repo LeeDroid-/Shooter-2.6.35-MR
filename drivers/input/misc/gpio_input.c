@@ -185,11 +185,21 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 void keypad_reprort_keycode(struct gpio_key_state *ks)
 {
 	struct gpio_input_state *ds = ks->ds;
-	int keymap_index = ks - ds->key_state;
+	int keymap_index;
 	const struct gpio_event_direct_entry *key_entry;
 	int pressed;
 
+	if (ds == NULL) {
+		KEY_LOGE("%s, (ds == NULL) failed\n", __func__);
+		return;
+	}
+	keymap_index = ks - ds->key_state;
+
 	key_entry = &ds->info->keymap[keymap_index];
+	if (key_entry == NULL) {
+		KEY_LOGE("%s, (key_entry == NULL) failed\n", __func__);
+		return;
+	}
 
 	pressed = gpio_get_value(key_entry->gpio) ^
 			!(ds->info->flags & GPIOEDF_ACTIVE_HIGH);
@@ -210,6 +220,7 @@ void keypad_reprort_keycode(struct gpio_key_state *ks)
 #endif
 		input_event(ds->input_devs->dev[key_entry->dev],
 				ds->info->type, key_entry->code, pressed);
+
 }
 
 #ifdef CONFIG_ARCH_MSM8X60

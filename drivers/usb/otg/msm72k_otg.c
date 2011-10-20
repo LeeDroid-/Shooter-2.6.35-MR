@@ -27,13 +27,13 @@
 #include <linux/ioport.h>
 #include <linux/pm_runtime.h>
 #include <linux/gpio.h>
+#include <linux/irq.h>
 
 #include <linux/device.h>
 #include <linux/pm_qos_params.h>
 #include <mach/msm_hsusb_hw.h>
 #include <mach/msm72k_otg.h>
 #include <mach/msm_hsusb.h>
-#include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <mach/clk.h>
 #include <mach/msm_xo.h>
@@ -44,9 +44,16 @@
 
 static void otg_reset(struct otg_transceiver *xceiv, int phy_reset);
 static void msm_otg_set_vbus_state(int online);
-static void msm_otg_set_id_state(int online);
+void msm_otg_set_id_state(int online);
 static int msm_otg_resume(struct msm_otg *dev);
 static int htc_otg_vbus;
+
+#ifdef CONFIG_USB_HOST_OC_DETECT
+static int host_oc_detect;
+#endif
+#ifdef CONFIG_USB_OTG_HOST
+void usb_host_switch(int on);
+#endif
 
 struct msm_otg *the_msm_otg;
 
@@ -325,8 +332,10 @@ static void otg_pm_qos_update_latency(struct msm_otg *dev, int vote)
 	struct msm_otg_platform_data *pdata = dev->pdata;
 	u32 swfi_latency = 0;
 
-	if (pdata)
-		swfi_latency = pdata->swfi_latency + 1;
+	if (!pdata)
+		return;
+
+	swfi_latency = pdata->swfi_latency + 1;
 
 	if (vote)
 		pm_qos_update_request(pdata->pm_qos_req_dma,
@@ -430,14 +439,16 @@ static int msm_otg_send_event(struct otg_transceiver *xceiv,
 	char *envp[] = { module_name, udev_event, NULL };
 	int ret;
 
-#if 0
+#if 1
 	USBH_DEBUG("sending %s event\n", event_string(event));
 #endif
 	snprintf(module_name, 16, "MODULE=%s", DRIVER_NAME);
 	snprintf(udev_event, 128, "EVENT=%s", event_string(event));
 	ret = kobject_uevent_env(&xceiv->dev->kobj, KOBJ_CHANGE, envp);
+#if 0
 	if (ret < 0)
 		USBH_ERR("uevent sending failed with ret = %d\n", ret);
+#endif
 	return ret;
 }
 
@@ -1551,6 +1562,88 @@ reset_link:
 	}
 }
 
+#ifdef CONFIG_USB_OTG_HOST
+void usb_host_vbus_invalid(int fromirq)
+{
+	struct msm_otg *dev = the_msm_otg;
+	enum usb_otg_state state;
+	u32 work = 0;
+
+	spin_lock_irq(&dev->lock);
+	state = dev->otg.state;
+	spin_unlock_irq(&dev->lock);
+
+	switch (state) {
+	case OTG_STATE_A_WAIT_BCON:
+	case OTG_STATE_A_HOST:
+	case OTG_STATE_A_PERIPHERAL:
+	case OTG_STATE_A_SUSPEND:
+		if (fromirq)
+			disable_irq_nosync(dev->pdata->usb_oc_irq);
+
+		usb_host_switch(0);
+		clear_bit(A_VBUS_VLD, &dev->inputs);
+		work = 1;
+		break;
+	default:
+		break;
+	}
+	if (work) {
+		USBH_INFO("[UsbHostNotify] Device not support (%s)\n",
+				(fromirq)?"gpio":"descriptor");
+		wake_lock(&dev->wlock);
+		queue_work_on(0, dev->wq, &dev->sm_work);
+	}
+}
+#endif
+
+#ifdef CONFIG_USB_HOST_OC_DETECT
+static irqreturn_t usb_oc_interrupt(int irq, void *data)
+{
+	struct msm_otg *dev = data;
+	enum usb_otg_state state;
+	u32 oc_status;
+
+	spin_lock_irq(&dev->lock);
+	state = dev->otg.state;
+	spin_unlock_irq(&dev->lock);
+
+	oc_status = gpio_get_value(dev->pdata->usb_oc_pin);
+	USBH_INFO("%s: usb_oc_det (%d) in %s\n", __func__,
+				oc_status, state_string(state));
+
+	if (oc_status == 0)
+		usb_host_vbus_invalid(1);
+
+	return IRQ_HANDLED;
+}
+
+static int host_overcurrent_detect(int on)
+{
+	struct msm_otg *dev = the_msm_otg;
+	int ret = 1;
+	unsigned int irq = dev->pdata->usb_oc_irq;
+
+	if (host_oc_detect == on || !irq)
+		return ret;
+	else
+		host_oc_detect = on;
+
+	USBH_INFO("IRQ usb_oc_det on %s",
+		(host_oc_detect)?"request":"release");
+
+	if (host_oc_detect) {
+		ret = request_irq(irq, usb_oc_interrupt,
+				IRQF_TRIGGER_LOW, "usb_oc_det", dev);
+		if (ret)
+			USB_ERR("request oc irq failed:(%d)", ret);
+	} else {
+		free_irq(irq, dev);
+	}
+
+	return 0;
+}
+#endif
 
 static void msm_otg_sm_work(struct work_struct *w)
 {
@@ -1873,6 +1966,10 @@ static void msm_otg_sm_work(struct work_struct *w)
 					A_WAIT_BCON);
 			/* Start HCD to detect peripherals. */
 			msm_otg_start_host(&dev->otg, REQUEST_START);
+#ifdef CONFIG_USB_HOST_OC_DETECT
+			/* Request OverCurrent IRQ */
+			host_overcurrent_detect(1);
+#endif
 		}
 		break;
 	case OTG_STATE_A_WAIT_BCON:
@@ -1938,6 +2035,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			/* Reset both phy and link */
 			otg_reset(&dev->otg, 1);
+			work = 1;
 		} else if (test_bit(ID_A, &dev->inputs)) {
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 		} else if (!test_bit(ID, &dev->inputs)) {
@@ -1969,7 +2067,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			/* Reset both phy and link */
 			otg_reset(&dev->otg, 1);
-			/* no work */
+			work = 1;
 		} else if (!test_bit(A_BUS_REQ, &dev->inputs)) {
 			/* a_bus_req is de-asserted when root hub is
 			 * suspended or HNP is in progress.
@@ -2039,6 +2137,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			/* Reset both phy and link */
 			otg_reset(&dev->otg, 1);
+			work = 1;
 		} else if (!test_bit(B_CONN, &dev->inputs) &&
 				dev->otg.host->b_hnp_enable) {
 			USBH_DEBUG("!b_conn && b_hnp_enable");
@@ -2118,6 +2217,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->otg.gadget->is_a_peripheral = 0;
 			/* HCD was suspended before. Stop it now */
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
+			work = 1;
 		} else if (test_bit(A_BIDL_ADIS, &dev->tmouts)) {
 			USBH_DEBUG("a_bidl_adis_tmout\n");
 			msm_otg_start_peripheral(&dev->otg, 0);
@@ -2156,8 +2256,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			work = 1;
 		}
+#ifdef CONFIG_USB_HOST_OC_DETECT
+		/* Release OverCurrent IRQ */
+		host_overcurrent_detect(0);
+#endif
 		break;
 	case OTG_STATE_A_VBUS_ERR:
+		set_bit(A_BUS_DROP, &dev->inputs);
 		if ((test_bit(ID, &dev->inputs) &&
 				!test_bit(ID_A, &dev->inputs)) ||
 				test_bit(A_BUS_DROP, &dev->inputs) ||
@@ -2167,6 +2272,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			if (!test_bit(ID_A, &dev->inputs))
 				dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
+			/* Notify: device draw invalid current */
+			msm_otg_send_event(&dev->otg,
+				OTG_EVENT_DEV_NOT_SUPPORTED);
+			clear_bit(A_BUS_DROP, &dev->inputs);
+			/* Clear A_BUS_REQ:
+			 * no more host connection if overcurrent*/
+			clear_bit(A_BUS_REQ, &dev->inputs);
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
 			msm_otg_set_power(&dev->otg, 0);
 		}
@@ -2320,83 +2432,6 @@ static struct attribute_group msm_otg_attr_grp = {
 	.attrs = msm_otg_attrs,
 };
 #endif
-
-#ifdef CONFIG_DEBUG_FS
-static int otg_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-static ssize_t otg_mode_write(struct file *file, const char __user *buf,
-				size_t count, loff_t *ppos)
-{
-	struct msm_otg *dev = file->private_data;
-	int ret = count;
-	int work = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&dev->lock, flags);
-	if (!memcmp(buf, "none", count - 1)) {
-		clear_bit(B_SESS_VLD, &dev->inputs);
-		set_bit(ID, &dev->inputs);
-		work = 1;
-	} else if (!memcmp(buf, "peripheral", count - 1)) {
-		set_bit(B_SESS_VLD, &dev->inputs);
-		set_bit(ID, &dev->inputs);
-		work = 1;
-	} else if (!memcmp(buf, "host", count - 1)) {
-		clear_bit(B_SESS_VLD, &dev->inputs);
-		clear_bit(ID, &dev->inputs);
-		set_bit(A_BUS_REQ, &dev->inputs);
-		work = 1;
-	} else {
-		USBH_INFO("%s: unknown mode specified\n", __func__);
-		ret = -EINVAL;
-	}
-	spin_unlock_irqrestore(&dev->lock, flags);
-
-	if (work) {
-		wake_lock(&dev->wlock);
-		queue_work_on(0, dev->wq, &dev->sm_work);
-	}
-
-	return ret;
-}
-const struct file_operations otgfs_fops = {
-	.open	= otg_open,
-	.write	= otg_mode_write,
-};
-
-struct dentry *otg_debug_root;
-struct dentry *otg_debug_mode;
-#endif
-
-static int otg_debugfs_init(struct msm_otg *dev)
-{
-#ifdef CONFIG_DEBUG_FS
-	otg_debug_root = debugfs_create_dir("otg", NULL);
-	if (!otg_debug_root)
-		return -ENOENT;
-
-	otg_debug_mode = debugfs_create_file("mode", 0220,
-						otg_debug_root, dev,
-						&otgfs_fops);
-	if (!otg_debug_mode) {
-		debugfs_remove(otg_debug_root);
-		otg_debug_root = NULL;
-		return -ENOENT;
-	}
-#endif
-	return 0;
-}
-
-static void otg_debugfs_cleanup(void)
-{
-#ifdef CONFIG_DEBUG_FS
-       debugfs_remove(otg_debug_mode);
-       debugfs_remove(otg_debug_root);
-#endif
-}
 
 static int __init msm_otg_probe(struct platform_device *pdev)
 {
@@ -2582,6 +2617,18 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto free_pmic_vbus_notif;
 		}
 	}
+#if (defined(CONFIG_ARCH_MSM8X60) && defined(CONFIG_USB_OTG_HOST))
+	else {
+		/*
+		 * 8x60 devices do not internal pull up id in phy
+		 *  to not interfere adc value, so we cannot rely
+		 *  on id interrupt on phy but based on callback
+		 *  notifier from cable_detect.c
+		 */
+		dev->pmic_id_notif_supp = 1;
+		dev->pmic_id_status = 1;
+	}
+#endif
 
 	if (dev->pdata->pmic_vbus_irq)
 		dev->vbus_on_irq = dev->pdata->pmic_vbus_irq;
@@ -2664,18 +2711,10 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_get(&pdev->dev);
 
-
-	ret = otg_debugfs_init(dev);
-	if (ret) {
-		USBH_INFO("%s: otg_debugfs_init failed\n", __func__);
-		goto chg_deinit;
-	}
-
 #ifdef CONFIG_USB_OTG
 	ret = sysfs_create_group(&pdev->dev.kobj, &msm_otg_attr_grp);
 	if (ret < 0) {
 		USBH_ERR("%s: Failed to create the sysfs entry\n", __func__);
-		otg_debugfs_cleanup();
 		goto chg_deinit;
 	}
 #endif
@@ -2750,7 +2789,6 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 {
 	struct msm_otg *dev = the_msm_otg;
 
-	otg_debugfs_cleanup();
 #ifdef CONFIG_USB_OTG
 	sysfs_remove_group(&pdev->dev.kobj, &msm_otg_attr_grp);
 #endif

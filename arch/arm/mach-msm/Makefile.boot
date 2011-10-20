@@ -52,6 +52,11 @@ ifeq ($(CONFIG_MACH_TAG),y)
 params_phys-y           := 0x04400100
 initrd_phys-y           := 0x05400000
 else
+ifeq ($(CONFIG_MACH_BLISS),y)
+  zreladdr-y            := 0x04408000
+params_phys-y           := 0x04400100
+initrd_phys-y           := 0x05400000
+else
 ifeq ($(CONFIG_MACH_SAGA),y)
   zreladdr-y            := 0x04408000
 params_phys-y           := 0x04400100
@@ -82,6 +87,7 @@ endif
 endif
 endif
 endif
+endif
 
 ifeq ($(CONFIG_ARCH_MSM7630),y)
 ifeq ($(CONFIG_MACH_MECHA),y)
@@ -100,6 +106,11 @@ params_phys-y           := 0x05000100
 initrd_phys-y           := 0x06000000
 else
 ifeq ($(CONFIG_MACH_TAGH),y)
+  zreladdr-y            := 0x05008000
+params_phys-y           := 0x05000100
+initrd_phys-y           := 0x06000000
+else
+ifeq ($(CONFIG_MACH_BLISSC),y)
   zreladdr-y            := 0x05008000
 params_phys-y           := 0x05000100
 initrd_phys-y           := 0x06000000
@@ -130,9 +141,16 @@ endif
 endif
 endif
 endif
+endif
 
 ifeq ($(CONFIG_ARCH_MSM8X60),y)
-zreladdr-y             := 0x48008000
-params_phys-y            := 0x48000100
-initrd_phys-y            := 0x49000000
+ifeq ($(CONFIG_MACH_SHOOTER_U),y)
+  zreladdr-y            := 0x48008000
+params_phys-y           := 0x48000100
+initrd_phys-y           := 0x49000000
+else
+  zreladdr-y            := 0x40408000
+params_phys-y           := 0x40400100
+initrd_phys-y           := 0x41400000
+endif
 endif

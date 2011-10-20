@@ -191,10 +191,10 @@ si_buscore_setup(si_info_t *sii, chipcregs_t *cc, uint bustype, uint32 savewin,
 	cc = si_setcoreidx(&sii->pub, SI_CC_IDX);
 	ASSERT((uintptr)cc);
 #ifdef HTC_KlocWork
-    if (cc == NULL){
-		SI_ERROR(("[HTCKW] si_buscore_setup: cc is NULL\n"));
-		return FALSE;
-	}
+    if(cc == NULL){
+        SI_ERROR(("[HTCKW] si_buscore_setup: cc is NULL\n"));
+        return FALSE;
+    }
 #endif
 	/* get chipcommon rev */
 	sii->pub.ccrev = (int)si_corerev(&sii->pub);
@@ -360,10 +360,10 @@ si_doattach(si_info_t *sii, uint devid, osl_t *osh, void *regs,
 	 *   some way of recognizing them needs to be added here.
 	 */
 #ifdef HTC_KlocWork
-	if (cc == NULL) {
-		SI_ERROR(("[HTCKW] si_doattach: cc is NULL-1\n"));
-		return NULL;
-	}
+    if(cc == NULL) {
+        SI_ERROR(("[HTCKW] si_doattach: cc is NULL-1\n"));
+        return NULL;
+    }
 #endif
 	w = R_REG(osh, &cc->chipid);
 	sih->socitype = (w & CID_TYPE_MASK) >> CID_TYPE_SHIFT;
@@ -406,10 +406,10 @@ si_doattach(si_info_t *sii, uint devid, osl_t *osh, void *regs,
 		if (sii->pub.ccrev >= 20) {
 			cc = (chipcregs_t *)si_setcore(sih, CC_CORE_ID, 0);
 #ifdef HTC_KlocWork
-	if (cc == NULL) {
-		SI_ERROR(("[HTCKW] si_doattach: cc is NULL-2\n"));
-		return NULL;
-	}
+    if(cc == NULL) {
+        SI_ERROR(("[HTCKW] si_doattach: cc is NULL-2\n"));
+        return NULL;
+    }
 #endif
 			W_REG(osh, &cc->gpiopullup, 0);
 			W_REG(osh, &cc->gpiopulldown, 0);
@@ -1043,7 +1043,7 @@ si_sdio_init(si_t *sih)
 	    (sih->buscoretype == SDIOD_CORE_ID)) {
 		uint idx;
 #ifdef HTC_KlocWork
-		sdpcmd_regs_t *sdpregs=NULL;
+        sdpcmd_regs_t *sdpregs=NULL;
 #else
 		sdpcmd_regs_t *sdpregs;
 #endif
@@ -1062,13 +1062,12 @@ si_sdio_init(si_t *sih)
 		        sih->buscorerev, idx, sii->curidx, sdpregs));
 
 #ifdef HTC_KlocWork
-		if (sdpregs != NULL) {
-			/* enable backplane error and core interrupts */
-			W_REG(sii->osh, &sdpregs->hostintmask, I_SBINT);
-			W_REG(sii->osh, &sdpregs->sbintmask,
-			(I_SB_SERR | I_SB_RESPERR | (1 << idx)));
-		} else
-			SI_ERROR(("[HTCKW] si_sdio_init: sdpregs is NULL\n"));
+        if(sdpregs != NULL) {
+            /* enable backplane error and core interrupts */
+            W_REG(sii->osh, &sdpregs->hostintmask, I_SBINT);
+            W_REG(sii->osh, &sdpregs->sbintmask, (I_SB_SERR | I_SB_RESPERR | (1 << idx)));
+        }else
+            SI_ERROR(("[HTCKW] si_sdio_init: sdpregs is NULL\n"));
 #else
 		/* enable backplane error and core interrupts */
 		W_REG(sii->osh, &sdpregs->hostintmask, I_SBINT);
@@ -1526,7 +1525,7 @@ si_btcgpiowar(si_t *sih)
 	cc = (chipcregs_t *)si_setcore(sih, CC_CORE_ID, 0);
 	ASSERT(cc != NULL);
 #ifdef HTC_KlocWork
-	if (cc != NULL)
+    if(cc != NULL)
 #endif
 	W_REG(sii->osh, &cc->uart0mcr, R_REG(sii->osh, &cc->uart0mcr) | 0x04);
 

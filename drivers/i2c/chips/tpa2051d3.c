@@ -58,6 +58,26 @@ struct pm8058_gpio tpa2051pwr = {
 	.function       = PM_GPIO_FUNC_NORMAL,
 };
 
+static int tpa2051_write_reg(u8 reg, u8 val)
+{
+	int err;
+	struct i2c_msg msg[1];
+	unsigned char data[2];
+
+	msg->addr = this_client->addr;
+	msg->flags = 0;
+	msg->len = 2;
+	msg->buf = data;
+	data[0] = reg;
+	data[1] = val;
+
+	err = i2c_transfer(this_client->adapter, msg, 1);
+	if (err >= 0)
+		return 0;
+
+	return err;
+}
+
 static int tpa2051_i2c_write(char *txData, int length)
 {
 	int i, retry, pass = 0;
@@ -99,35 +119,74 @@ static int tpa2051_i2c_write(char *txData, int length)
 	return 0;
 }
 
-static int tpa2051_i2c_read(char *rxData, int length)
+static int tpa2051_i2c_write_for_read(char *txData, int length)
 {
-	uint8_t loop_i;
-	struct i2c_msg msgs[] = {
+	int i, retry, pass = 0;
+	char buf[2];
+	struct i2c_msg msg[] = {
 		{
 		 .addr = this_client->addr,
 		 .flags = 0,
-		 .len = 1,
-		 .buf = rxData,
-		 },
+		 .len = 2,
+		 .buf = buf,
+		},
+	};
+	for (i = 0; i < length; i++) {
+		if (i == 2)  /* According to tpa2051 Spec */
+			mdelay(1);
+		buf[0] = i;
+		buf[1] = txData[i];
+/* #if DEBUG */
+		pr_info("i2c_write %d=%x\n", i, buf[1]);
+/* #endif */
+		msg->buf = buf;
+		retry = RETRY_CNT;
+		pass = 0;
+		while (retry--) {
+			if (i2c_transfer(this_client->adapter, msg, 1) < 0) {
+				pr_err("%s: I2C transfer error %d retry %d\n",
+						__func__, i, retry);
+				msleep(20);
+			} else {
+				pass = 1;
+				break;
+			}
+		}
+		if (pass == 0) {
+			pr_err("I2C transfer error, retry fail\n");
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
+static int tpa2051_i2c_read(char *rxData, int length)
+{
+	int rc;
+	struct i2c_msg msgs[] = {
 		{
 		 .addr = this_client->addr,
 		 .flags = I2C_M_RD,
 		 .len = length,
 		 .buf = rxData,
-		 },
+		},
 	};
 
-	for (loop_i = 0; loop_i < RETRY_CNT; loop_i++) {
-		if (i2c_transfer(this_client->adapter, msgs, 2) > 0) {
-			break;
-		}
-		mdelay(10);
+	rc = i2c_transfer(this_client->adapter, msgs, 1);
+	if (rc < 0) {
+		pr_err("%s: transfer error %d\n", __func__, rc);
+		return rc;
 	}
 
-	if (loop_i >= RETRY_CNT) {
-		printk(KERN_ERR "%s retry over %d\n", __func__, RETRY_CNT);
-		return -EIO;
+#if DEBUG
+	{
+		int i = 0;
+		for (i = 0; i < length; i++)
+			pr_info("i2c_read %s: rx[%d] = %2x\n", __func__, i, \
+				rxData[i]);
 	}
+#endif
+
 	return 0;
 }
 
@@ -227,11 +286,37 @@ tpa2051d3_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int i = 0;
 #endif
 	unsigned char tmp[7];
-	unsigned char reg_idx[1] = {0x00};
+	unsigned char reg_idx[1] = {0x01};
 	unsigned char spk_cfg[8];
+	unsigned char reg_value[2];
 	struct tpa2051_config_data cfg;
 
 	switch (cmd) {
+	case TPA2051_WRITE_REG:
+		pr_info("%s: TPA2051_WRITE_REG\n", __func__);
+		mutex_lock(&spk_amp_lock);
+		if (!last_spkamp_state) {
+			tpa2051pwr.output_value = 1;
+			rc = pm8058_gpio_config(pdata->gpio_tpa2051_spk_en,
+							&tpa2051pwr);
+
+			/* According to tpa2051d3 Spec */
+			mdelay(30);
+		}
+		if (copy_from_user(reg_value, argp, sizeof(reg_value)))
+			goto err1;
+		pr_info("%s: reg_value[0]=%2x, reg_value[1]=%2x\n", __func__,  \
+				reg_value[0], reg_value[1]);
+		rc = tpa2051_write_reg(reg_value[0], reg_value[1]);
+
+err1:
+		if (!last_spkamp_state) {
+			tpa2051pwr.output_value = 0;
+			pm8058_gpio_config(pdata->gpio_tpa2051_spk_en,
+						&tpa2051pwr);
+		}
+		mutex_unlock(&spk_amp_lock);
+		break;
 	case TPA2051_SET_CONFIG:
 		if (copy_from_user(spk_cfg, argp, sizeof(spk_cfg)))
 			return -EFAULT;
@@ -257,17 +342,18 @@ tpa2051d3_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			/* According to tpa2051d3 Spec */
 			mdelay(30);
 		}
-		rc = tpa2051_i2c_write(reg_idx, sizeof(reg_idx));
+
+		rc = tpa2051_i2c_write_for_read(reg_idx, sizeof(reg_idx));
 		if (rc < 0)
-			goto err;
+			goto err2;
 
 		rc = tpa2051_i2c_read(tmp, sizeof(tmp));
 		if (rc < 0)
-			goto err;
+			goto err2;
 
 		if (copy_to_user(argp, &tmp, sizeof(tmp)))
 			rc = -EFAULT;
-err:
+err2:
 		if (!last_spkamp_state) {
 			tpa2051pwr.output_value = 0;
 			pm8058_gpio_config(pdata->gpio_tpa2051_spk_en,

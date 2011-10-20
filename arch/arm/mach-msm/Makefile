@@ -3,7 +3,6 @@ obj-y += io.o dma.o memory.o
 ifdef CONFIG_ARCH_MSM8X60
 obj-y += timer-8x60.o clock-core.o clock-voter.o
 obj-$(CONFIG_MSM_WATCHDOG) += msm_watchdog.o
-obj-$(CONFIG_MSM_WATCHDOG) += htc_watchdog_monitor.o
 else
 obj-y += timer.o clock.o
 endif
@@ -66,15 +65,14 @@ target += smd_rpc_sym.c
 $(obj)/smd_rpc_sym.c: $(src)/smd_rpc_sym $(src)/mkrpcsym.pl
 	$(call if_changed,mkrpcsym)
 
+ifeq ($(CONFIG_ARCH_MSM8X60_LTE),y)
+obj-$(CONFIG_ARCH_MSM8X60_LTE) += 8x60-lte/
+else
 obj-y += modem_notifier.o
 obj-$(CONFIG_MSM_SMD_LOGGING) += smem_log-8x60.o
 obj-$(CONFIG_MSM_SMD) += smd-8x60.o smd_debug-8x60.o
 obj-$(CONFIG_MSM_SMD_TTY) += smd_tty-8x60.o
 obj-$(CONFIG_MSM_SMD_QMI) += smd_qmi-8x60.o
-
-ifeq ($(CONFIG_ARCH_MSM8X60_LTE),y)
-obj-$(CONFIG_ARCH_MSM8X60_LTE) += 8x60-lte/
-endif
 
 obj-$(CONFIG_MSM_SMD_PKT) += smd_pkt-8x60.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter-8x60.o
@@ -85,6 +83,8 @@ obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_servers-8x60.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_clients-8x60.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_xdr-8x60.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += rpcrouter_smd_xprt-8x60.o
+endif
+
 obj-$(CONFIG_MSM_RPC_PING) += ping_mdm_rpc_client-8x60.o ping_apps_server-8x60.o
 obj-$(CONFIG_MSM_RPC_OEM_RAPI) += oem_rapi_client-8x60.o
 obj-$(CONFIG_MSM_RPC_WATCHDOG) += rpc_dog_keepalive-8x60.o
@@ -176,6 +176,11 @@ obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-keypad.o board-common-wimax.o 
 obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-rfkill.o board-supersonic-audio.o
 obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-wifi.o htc_awb_cal.o
 obj-$(CONFIG_MACH_SUPERSONIC) += board-supersonic-microp.o
+obj-$(CONFIG_MACH_OBOEA) += board-oboea.o board-oboea-panel.o
+obj-$(CONFIG_MACH_OBOEA) += board-oboea-keypad.o board-common-wimax.o board-oboea-mmc.o
+obj-$(CONFIG_MACH_OBOEA) += board-oboea-rfkill.o board-oboea-audio.o
+obj-$(CONFIG_MACH_OBOEA) += board-oboea-wifi.o htc_awb_cal.o
+obj-$(CONFIG_MACH_OBOEA) += board-oboea-microp.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo.o panel-samsungwvga-tl2796a.o panel-sonywvga-s6d16a0x21.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-keypad.o board-bravo-mmc.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-rfkill.o
@@ -330,6 +335,20 @@ obj-$(CONFIG_MACH_TAGH)+= board-tagh-mmc.o board-tagh-wifi.o
 obj-$(CONFIG_MACH_TAGH)+= board-tagh-rfkill.o
 obj-$(CONFIG_MACH_TAGH)+= board-tagh-panel.o htc_bluetooth.o
 
+obj-$(CONFIG_MACH_BLISS)+= board-bliss.o
+obj-$(CONFIG_MACH_BLISS)+= board-bliss-keypad.o
+obj-$(CONFIG_MACH_BLISS)+= board-bliss-audio.o
+obj-$(CONFIG_MACH_BLISS)+= board-bliss-mmc.o board-bliss-wifi.o
+obj-$(CONFIG_MACH_BLISS)+= board-bliss-rfkill.o
+obj-$(CONFIG_MACH_BLISS)+= board-bliss-panel.o htc_bluetooth.o
+
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc.o
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc-keypad.o
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc-audio.o
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc-mmc.o board-blissc-wifi.o
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc-rfkill.o
+obj-$(CONFIG_MACH_BLISSC)+= board-blissc-panel.o htc_bluetooth.o
+
 # MSM7200A boards
 obj-$(CONFIG_MACH_HERO) += board-hero.o board-hero-panel.o board-hero-keypad.o
 obj-$(CONFIG_MACH_HERO) += board-hero-rfkill.o
@@ -384,17 +403,13 @@ obj-$(CONFIG_MACH_SHOOTER) += htc_bdaddress.o htc_sleep_clk.o board-shooter-rfki
 obj-$(CONFIG_MACH_SHOOTER) += board-common-wimax.o board-shooter-mmc.o board-shooter-wifi.o
 obj-$(CONFIG_MACH_SHOOTER) += board-shooter-keypad.o
 obj-$(CONFIG_MACH_SHOOTER) += display/shooter-panel.o
+obj-$(CONFIG_MACH_SHOOTER_CT) += board-shooter_ct.o
 obj-$(CONFIG_MACH_RIDER) += board-rider.o
 obj-$(CONFIG_MACH_RIDER) += board-rider-audio.o
 obj-$(CONFIG_MACH_RIDER) += htc_bdaddress.o htc_sleep_clk.o board-rider-rfkill.o
 obj-$(CONFIG_MACH_RIDER) += board-common-wimax.o board-rider-mmc.o board-rider-wifi.o
 obj-$(CONFIG_MACH_RIDER) += board-rider-keypad.o
 obj-$(CONFIG_MACH_RIDER) += display/rider-panel.o
-obj-$(CONFIG_MACH_SHOOTER_K) += board-shooter_k.o board-shooter_k-audio.o
-obj-$(CONFIG_MACH_SHOOTER_K) += htc_bdaddress.o htc_sleep_clk.o board-shooter_k-rfkill.o
-obj-$(CONFIG_MACH_SHOOTER_K) += board-common-wimax.o board-shooter_k-mmc.o board-shooter_k-wifi.o
-obj-$(CONFIG_MACH_SHOOTER_K) += board-shooter_k-keypad.o
-obj-$(CONFIG_MACH_SHOOTER_K) += display/shooter_k-panel.o
 obj-$(CONFIG_MACH_SHOOTER_U) += board-shooter_u.o board-shooter_u-audio.o
 obj-$(CONFIG_MACH_SHOOTER_U) += htc_bdaddress.o htc_sleep_clk.o board-shooter_u-rfkill.o
 obj-$(CONFIG_MACH_SHOOTER_U) += board-shooter_u-mmc.o board-shooter_u-wifi.o
@@ -425,6 +440,7 @@ obj-$(CONFIG_MACH_VERDI_LTE) += board-verdi-lte-mmc.o board-verdi-lte-wifi.o
 obj-$(CONFIG_MACH_HOLIDAY) += board-holiday.o
 obj-$(CONFIG_MACH_HOLIDAY) += board-holiday-audio.o
 obj-$(CONFIG_MACH_HOLIDAY) += board-holiday-keypad.o
+obj-$(CONFIG_MACH_HOLIDAY) += display/holiday-panel.o
 obj-$(CONFIG_MACH_HOLIDAY) += htc_bdaddress.o htc_sleep_clk.o board-holiday-rfkill.o htc_fmtx_rfkill.o
 obj-$(CONFIG_MACH_HOLIDAY) += board-holiday-mmc.o board-holiday-wifi.o
 obj-$(CONFIG_MACH_VIGOR) += board-vigor.o
@@ -435,6 +451,7 @@ obj-$(CONFIG_MACH_VIGOR) += board-vigor-mmc.o board-vigor-wifi.o
 obj-$(CONFIG_MACH_RUBY) += board-ruby.o
 obj-$(CONFIG_MACH_RUBY) += board-ruby-audio.o
 obj-$(CONFIG_MACH_RUBY) += board-ruby-keypad.o
+obj-$(CONFIG_MACH_RUBY) += display/ruby-panel.o
 obj-$(CONFIG_MACH_RUBY) += htc_bdaddress.o htc_sleep_clk.o htc_fast_clk.o board-ruby-rfkill.o
 obj-$(CONFIG_MACH_RUBY) += board-ruby-mmc.o board-ruby-wifi.o
 

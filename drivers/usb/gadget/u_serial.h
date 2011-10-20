@@ -16,6 +16,8 @@
 #include <linux/usb/cdc.h>
 #include <mach/usb_gadget_fserial.h>
 
+#define PREFIX	"ttyHSUSB"
+
 /*
  * One non-multiplexed "serial" I/O port ... there can be several of these
  * on any given USB peripheral device, if it provides enough endpoints.
@@ -53,13 +55,10 @@ struct gserial {
 	int (*send_break)(struct gserial *p, int duration);
 	unsigned int (*send_carrier_detect)(struct gserial *p, unsigned int);
 	unsigned int (*send_ring_indicator)(struct gserial *p, unsigned int);
-
-#ifdef CONFIG_USB_F_SERIAL_SDIO
 	int (*send_modem_ctrl_bits)(struct gserial *p, int ctrl_bits);
+
 	/* notification changes to modem */
 	void (*notify_modem)(struct gserial *gser, u8 portno, int ctrl_bits);
-#endif
-
 };
 
 /* utilities to allocate/free request and buffer */
@@ -74,17 +73,15 @@ void gserial_cleanup(void);
 int gserial_connect(struct gserial *, u8 port_num);
 void gserial_disconnect(struct gserial *);
 
-#ifdef CONFIG_USB_F_SERIAL_SDIO
+#if defined(CONFIG_USB_F_SERIAL_SDIO) || defined(CONFIG_USB_ANDROID_ACM_SDIO)
 /* sdio related functions */
-int gsdio_setup(struct usb_gadget *g, unsigned n_ports,
-		struct sdio_port_info *pi);
+int gsdio_setup(struct usb_gadget *g, unsigned n_ports);
 int gsdio_connect(struct gserial *, u8 port_num);
 void gsdio_disconnect(struct gserial *, u8 portno);
 
 void gsdio_state_chg_notify(int port, int ebl_state);
 #else
-static inline int gsdio_setup(struct usb_gadget *g, unsigned n_ports,
-		struct sdio_port_info *pi)
+static inline int gsdio_setup(struct usb_gadget *g, unsigned n_ports)
 {
 	return 0;
 }
@@ -103,6 +100,24 @@ static inline void gsdio_state_chg_notify(int port, int ebl_state)
 }
 #endif
 
+#if defined(CONFIG_USB_F_SERIAL_SMD) || defined(CONFIG_USB_ANDROID_ACM_SMD)
+int gsmd_setup(struct usb_gadget *g, unsigned n_ports);
+int gsmd_connect(struct gserial *, u8 port_num);
+void gsmd_disconnect(struct gserial *, u8 portno);
+#else
+static inline int gsmd_setup(struct usb_gadget *g, unsigned n_ports)
+{
+	return 0;
+}
+static inline int gsmd_connect(struct gserial *g, u8 port_num)
+{
+	return 0;
+}
+static inline void gsmd_disconnect(struct gserial *g, u8 portno)
+{
+	return;
+}
+#endif
 
 /* functions are bound to configurations by a config or gadget driver */
 int acm_bind_config(struct usb_configuration *c, u8 port_num);

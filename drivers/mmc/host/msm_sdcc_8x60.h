@@ -174,7 +174,7 @@
  * Set the request timeout to 10secs to allow
  * bad cards/controller to respond.
  */
-#define MSM_MMC_REQ_TIMEOUT	5000 /* msecs */
+#define MSM_MMC_REQ_TIMEOUT	3000 /* msecs */
 
 struct clk;
 

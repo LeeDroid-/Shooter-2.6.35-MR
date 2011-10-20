@@ -1810,9 +1810,9 @@ wl_iw_parse_data_tlv(char** list_str, void *dst, int dst_size, const char token,
                      int input_size, int *bytes_left)
 {
 #ifdef HTC_KlocWork
-	char *str = NULL;
+	char* str = NULL;
 #else
-	char *str = *list_str;
+	char* str = *list_str;
 #endif
 	uint16 short_temp;
 	uint32 int_temp;
@@ -1867,9 +1867,9 @@ wl_iw_parse_channel_list_tlv(char** list_str, uint16* channel_list,
                              int channel_num, int *bytes_left)
 {
 #ifdef HTC_KlocWork
-	char *str = NULL;
+	char* str = NULL;
 #else
-	char *str = *list_str;
+	char* str = *list_str;
 #endif
 	int idx = 0;
 
@@ -1921,9 +1921,9 @@ int
 wl_iw_parse_ssid_list_tlv(char** list_str, wlc_ssid_t* ssid, int max, int *bytes_left)
 {
 #ifdef HTC_KlocWork
-	char *str = NULL;
+	char* str = NULL;
 #else
-	char *str = *list_str;
+	char* str = *list_str;
 #endif
 	int idx = 0;
 
@@ -2028,10 +2028,9 @@ wl_iw_parse_ssid_list(char** list_str, wlc_ssid_t* ssid, int idx, int max)
 
 		if (idx < max) {
 #ifdef HTC_KlocWork
-			strncpy((char *)ssid[idx].SSID, str,
-			DOT11_MAX_SSID_LEN);
+            strncpy((char*)ssid[idx].SSID, str, DOT11_MAX_SSID_LEN);
 #else
-			strcpy((char *)ssid[idx].SSID, str);
+            strcpy((char*)ssid[idx].SSID, str);
 #endif
 			ssid[idx].SSID_len = strlen(str);
 		}

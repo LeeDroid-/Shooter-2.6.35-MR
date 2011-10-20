@@ -9,7 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Pub_decoder_seq_done_callback(lic License
+ * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
  * 02110-1301, USA.
@@ -166,7 +166,7 @@ static u32 ddl_encoder_seq_done_callback(struct ddl_context *ddl_context,
 		ddl->command_channel);
 	return true;
 }
- 
+
 static void parse_hdr_size_data(struct ddl_client_context *ddl,
 	struct vidc_1080p_seq_hdr_info *seq_hdr_info)
 {
@@ -262,12 +262,10 @@ static u32 ddl_decoder_seq_done_callback(struct ddl_context *ddl_context,
 			seq_hdr_info.level);
 		ddl_calculate_stride(&decoder->frame_size,
 			!decoder->progressive_only);
-
 		decoder->frame_size.scan_lines =
 		DDL_ALIGN(decoder->frame_size.height, DDL_TILE_ALIGN_HEIGHT);
 		decoder->frame_size.stride =
 		DDL_ALIGN(decoder->frame_size.width, DDL_TILE_ALIGN_WIDTH);
-
 		parse_hdr_crop_data(ddl, &seq_hdr_info);
 		if (decoder->codec.codec == VCD_CODEC_H264 &&
 			seq_hdr_info.level > VIDC_1080P_H264_LEVEL4) {
@@ -589,7 +587,6 @@ static u32 ddl_decoder_frame_run_callback(struct ddl_client_context *ddl)
 	u32 callback_end = false, ret_status = false;
 	u32 eos_present = false, rsl_chg;
 	enum vidc_1080p_display_status disp_status;
-
 	DDL_MSG_MED("ddl_decoder_frame_run_callback");
 	if (!DDLCLIENT_STATE_IS(ddl, DDL_CLIENT_WAIT_FOR_FRAME_DONE)) {
 		DDL_MSG_ERROR("STATE-CRITICAL-DECFRMRUN");
@@ -650,7 +647,7 @@ static u32 ddl_decoder_frame_run_callback(struct ddl_client_context *ddl)
 						ddl->command_channel);
 					ret_status = true;
 				}
- 			}
+			}
 		}
 	}
 	return ret_status;
@@ -824,7 +821,12 @@ static void ddl_encoder_eos_done(struct ddl_context *ddl_context)
 	vidc_1080p_clear_returned_channel_inst_id();
 	ddl = ddl_get_current_ddl_client_for_channel_id(ddl_context,
 			ddl_context->response_cmd_ch_id);
-	if (!ddl || (!DDLCLIENT_STATE_IS(ddl, DDL_CLIENT_WAIT_FOR_EOS_DONE))) {
+/*HTC_START Fix Klocwork issue*/
+	if (!ddl) {
+		DDL_MSG_ERROR("ERROR, ddl==NULL");
+		return;
+	} else if (!DDLCLIENT_STATE_IS(ddl, DDL_CLIENT_WAIT_FOR_EOS_DONE)) {
+/*HTC_END*/
 		DDL_MSG_ERROR("STATE-CRITICAL-EOSFRMDONE");
 		ddl_client_fatal_cb(ddl);
 	} else {
@@ -952,10 +954,10 @@ static void ddl_decoder_input_done_callback(
 	is_interlaced = (dec_disp_info->decode_coding ==
 		VIDC_1080P_DISPLAY_CODING_INTERLACED);
 	if (decoder->output_order == VCD_DEC_ORDER_DECODE) {
-		dec_disp_info->tag_top = input_vcd_frm->ip_frm_tag;
 		dec_disp_info->tag_bottom = is_interlaced ?
-			input_vcd_frm->intrlcd_ip_frm_tag :
+			dec_disp_info->tag_top :
 			VCD_FRAMETAG_INVALID;
+		dec_disp_info->tag_top = input_vcd_frm->ip_frm_tag;
 	}
 	input_vcd_frm->interlaced = is_interlaced;
 	input_vcd_frm->offset += dec_disp_info->input_bytes_consumed;

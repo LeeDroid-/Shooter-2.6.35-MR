@@ -55,8 +55,7 @@ struct completion mdp_ppp_comp;
 struct semaphore mdp_ppp_mutex;
 struct semaphore mdp_pipe_ctrl_mutex;
 
-unsigned long mdp_timer_duration = (HZ/20);   /* 50ms */
-/* unsigned long mdp_mdp_timer_duration=0; */
+unsigned long mdp_timer_duration = (HZ/20);
 
 boolean mdp_ppp_waiting = FALSE;
 uint32 mdp_tv_underflow_cnt;
@@ -128,6 +127,9 @@ struct timeval mdp_ppp_timeval;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static struct early_suspend early_suspend;
+#ifdef CONFIG_HTC_ONMODE_CHARGING
+static struct early_suspend onchg_suspend;
+#endif
 #endif
 
 #ifndef CONFIG_MSM_MDP22
@@ -1507,6 +1509,11 @@ static int mdp_register_driver(void)
 	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
 	early_suspend.suspend = mdp_early_suspend;
 	register_early_suspend(&early_suspend);
+#ifdef CONFIG_HTC_ONMODE_CHARGING
+	onchg_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
+	onchg_suspend.suspend = mdp_early_suspend;
+	register_onchg_suspend(&onchg_suspend);
+#endif
 #endif
 
 	return platform_driver_register(&mdp_driver);

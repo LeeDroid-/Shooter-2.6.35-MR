@@ -37,6 +37,7 @@ struct acoustic_ops {
 	void (*mute_headset_amp) (int en);
 	void (*get_acoustic_tables)(struct acoustic_tables *tb);
 	int (*support_aic3254_use_mclk) (void);
+	int (*get_speaker_channels) (void);
 };
 
 void acoustic_register_ops(struct acoustic_ops *ops);

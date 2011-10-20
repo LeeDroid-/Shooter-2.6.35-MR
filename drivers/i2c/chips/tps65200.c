@@ -22,11 +22,14 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/workqueue.h>
-#include <linux/android_alarm.h>
 #include <linux/tps65200.h>
 #include <linux/power_supply.h>
 #include <linux/spinlock.h>
 #include <linux/wakelock.h>
+#if defined(CONFIG_MACH_HOLIDAY)
+#include <linux/usb/android_composite.h>
+#include <mach/board_htc.h>
+#endif
 
 #define pr_tps_fmt(fmt) "[BATT][tps65200] " fmt
 #define pr_tps_err_fmt(fmt) "[BATT][tps65200] err:" fmt
@@ -35,11 +38,9 @@
 #define pr_tps_err(fmt, ...) \
 	printk(KERN_ERR pr_tps_err_fmt(fmt), ##__VA_ARGS__)
 
-#define TPS65200_CHECK_INTERVAL (900)
+#define TPS65200_CHECK_INTERVAL (200)
 
-static struct alarm tps65200_check_alarm;
 static struct workqueue_struct *tps65200_wq;
-static struct work_struct check_alarm_work;
 static struct work_struct chg_stat_work;
 
 static int chg_stat_int;
@@ -58,6 +59,10 @@ static int tps65200_chager_check;
 
 #ifdef CONFIG_SUPPORT_DQ_BATTERY
 static int htc_is_dq_pass;
+#endif
+
+#if defined(CONFIG_MACH_HOLIDAY)
+u8 batt_charging_state = 0;
 #endif
 
 /**
@@ -83,16 +88,6 @@ struct tps65200_i2c_client {
 	struct mutex xfer_lock;
 };
 static struct tps65200_i2c_client tps65200_i2c_module;
-
-static void tps65200_set_check_alarm(void)
-{
-	ktime_t interval;
-	ktime_t next_alarm;
-
-	interval = ktime_set(TPS65200_CHECK_INTERVAL, 0);
-	next_alarm = ktime_add(alarm_get_elapsed_realtime(), interval);
-	alarm_start_range(&tps65200_check_alarm, next_alarm, next_alarm);
-}
 
 /**
 Function:tps65200_i2c_write
@@ -283,7 +278,17 @@ int tps_set_charger_ctrl(u32 ctl)
 	u8 status;
 	u8 regh;
 	u8 regh1, regh2, regh3;
-
+#if defined(CONFIG_MACH_HOLIDAY)
+	if (get_kernel_flag() & BIT24){
+		if(in_usb_tethering && (ctl==POWER_SUPPLY_ENABLE_SLOW_CHARGE)){
+			printk("[BATT] in_usb_tethering: SLOW_CHARGE -> FAST_CHARGE\n");
+			/*Force fast charge when battery driver would like to charging if battery not full*/
+			ctl = POWER_SUPPLY_ENABLE_FAST_CHARGE;
+		}
+		batt_charging_state = ctl;
+	}
+	printk("[BATT] %s(%d)\n",__func__, ctl);
+#endif
 	if (tps65200_initial < 0)
 		return 0;
 
@@ -293,9 +298,6 @@ int tps_set_charger_ctrl(u32 ctl)
 		tps65200_set_chg_stat(0);
 		tps65200_i2c_write_byte(0x29, 0x01);
 		tps65200_i2c_write_byte(0x28, 0x00);
-		if (tps65200_chager_check)
-			/* cancel CHECK_CHG alarm */
-			alarm_cancel(&tps65200_check_alarm);
 		break;
 	case POWER_SUPPLY_ENABLE_SLOW_CHARGE:
 	case POWER_SUPPLY_ENABLE_WIRELESS_CHARGE:
@@ -322,9 +324,6 @@ int tps_set_charger_ctrl(u32 ctl)
 		tps65200_i2c_read_byte(&regh2, 0x02);
 		pr_tps_info("Switch charger ON (SLOW): regh 0x03=%x, "
 				"regh 0x02=%x\n", regh1, regh2);
-		if (tps65200_chager_check)
-			/* set alarm for CHECK_CHG */
-			tps65200_set_check_alarm();
 		tps65200_set_chg_stat(1);
 		break;
 	case POWER_SUPPLY_ENABLE_FAST_CHARGE:
@@ -354,9 +353,6 @@ int tps_set_charger_ctrl(u32 ctl)
 		pr_tps_info("Switch charger ON (FAST): regh 0x01=%x, "
 				"regh 0x00=%x, regh 0x03=%x, regh 0x02=%x\n",
 				regh, regh1, regh2, regh3);
-		if (tps65200_chager_check)
-			/* set alarm for CHECK_CHG */
-			tps65200_set_check_alarm();
 		tps65200_set_chg_stat(1);
 		break;
 	case POWER_SUPPLY_ENABLE_SLOW_HV_CHARGE:
@@ -371,9 +367,6 @@ int tps_set_charger_ctrl(u32 ctl)
 		tps65200_i2c_read_byte(&regh1, 0x02);
 		pr_tps_info("Switch charger ON (SLOW_HV): regh 0x03=%x, "
 				"regh 0x02=%x\n", regh, regh1);
-		if (tps65200_chager_check)
-			/* set alarm for CHECK_CHG */
-			tps65200_set_check_alarm();
 		break;
 	case POWER_SUPPLY_ENABLE_FAST_HV_CHARGE:
 		tps65200_i2c_write_byte(0x29, 0x01);
@@ -390,18 +383,19 @@ int tps_set_charger_ctrl(u32 ctl)
 		pr_tps_info("Switch charger ON (FAST_HV): regh 0x01=%x, "
 				"regh 0x01=%x, regh 0x03=%x, regh 0x02=%x\n",
 				regh, regh1, regh2, regh3);
-		if (tps65200_chager_check)
-			/* set alarm for CHECK_CHG */
-			tps65200_set_check_alarm();
 		break;
 	case ENABLE_LIMITED_CHG:
-		tps65200_i2c_write_byte(0x8B, 0x03);
+		tps65200_i2c_read_byte(&regh, 0x03);
+		regh |= 0x08;
+		tps65200_i2c_write_byte(regh, 0x03);
 		tps65200_low_chg = 1;
 		tps65200_i2c_read_byte(&regh, 0x03);
 		pr_tps_info("Switch charger ON (LIMITED): regh 0x03=%x\n", regh);
 		break;
 	case CLEAR_LIMITED_CHG:
-		tps65200_i2c_write_byte(0x83, 0x03);
+		tps65200_i2c_read_byte(&regh, 0x03);
+		regh &= 0xF7;
+		tps65200_i2c_write_byte(regh, 0x03);
 		tps65200_low_chg = 0;
 		tps65200_i2c_read_byte(&regh, 0x03);
 		pr_tps_info("Switch charger OFF (LIMITED): regh 0x03=%x\n", regh);
@@ -547,6 +541,7 @@ static void tps65200_int_func(struct work_struct *work)
 			tps65200_set_chg_stat(0);
 			tps65200_i2c_write_byte(0x29, 0x01);
 			tps65200_i2c_write_byte(0x28, 0x00);
+			send_tps_chg_int_notify(CHECK_INT2, 1);
 			cancel_delayed_work(&chg_int_data->int_work);
 			enable_irq(chg_int_data->gpio_chg_int);
 		} else {
@@ -572,17 +567,6 @@ static void chg_stat_work_func(struct work_struct *work)
 	return;
 }
 
-static void tps65200_check_alarm_handler(struct alarm *alarm)
-{
-	queue_work(tps65200_wq, &check_alarm_work);
-}
-
-static void check_alarm_work_func(struct work_struct *work)
-{
-	tps65200_dump_register();
-	tps65200_set_check_alarm();
-}
-
 static int tps65200_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -600,15 +584,6 @@ static int tps65200_probe(struct i2c_client *client,
 	if (!tps65200_wq) {
 		pr_tps_err("Failed to create tps65200 workqueue.");
 		return -ENOMEM;
-	}
-
-	if (pdata->charger_check) {
-		tps65200_chager_check = 1;
-		pr_tps_info("for battery driver 8x60.\n");
-		INIT_WORK(&check_alarm_work, check_alarm_work_func);
-		alarm_init(&tps65200_check_alarm,
-			ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
-			tps65200_check_alarm_handler);
 	}
 
 #ifdef CONFIG_SUPPORT_DQ_BATTERY

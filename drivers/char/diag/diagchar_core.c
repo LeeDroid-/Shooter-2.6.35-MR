@@ -156,6 +156,8 @@ void diag_read_smd_qdsp_work_fn(struct work_struct *work)
 static int diagchar_open(struct inode *inode, struct file *file)
 {
 	int i = 0;
+	void *temp;
+
 	DIAG_INFO("%s:%s(parent:%s): tgid=%d\n", __func__,
 	current->comm, current->parent->comm, current->tgid);
 	if (driver) {
@@ -172,9 +174,18 @@ static int diagchar_open(struct inode *inode, struct file *file)
 		} else {
 			if (i < threshold_client_limit) {
 				driver->num_clients++;
-				driver->client_map = krealloc(driver->client_map
-					, (driver->num_clients) * sizeof(struct
-						 diag_client_map), GFP_KERNEL);
+				temp = krealloc(driver->client_map,
+					    (driver->num_clients) * sizeof(struct
+					    diag_client_map), GFP_KERNEL);
+				BUG_ON(!temp);
+				driver->client_map = temp;
+
+				temp = krealloc(driver->data_ready,
+					    (driver->num_clients) * sizeof(int),
+					    GFP_KERNEL);
+				BUG_ON(!temp);
+				driver->data_ready = temp;
+
 				driver->client_map[i].pid = current->tgid;
 				strncpy(driver->client_map[i].name,
 					current->comm, 20);
@@ -213,6 +224,10 @@ static int diagchar_open(struct inode *inode, struct file *file)
 static int diagchar_close(struct inode *inode, struct file *file)
 {
 	int i = 0;
+
+	if (!driver)
+		return -ENOMEM;
+
 #ifdef CONFIG_DIAG_OVER_USB
 	/* If the SD logging process exits, change logging to USB mode */
 	if (driver->logging_process_id == current->tgid) {
@@ -221,27 +236,25 @@ static int diagchar_close(struct inode *inode, struct file *file)
 	}
 #endif /* DIAG over USB */
 	/* Delete the pkt response table entry for the exiting process */
-	for (i = 0; i < diag_max_registration; i++)
-			if (driver->table[i].process_id == current->tgid)
-					driver->table[i].process_id = 0;
-
-	if (driver) {
-		mutex_lock(&driver->diagchar_mutex);
-		driver->ref_count--;
-				/* On Client exit, try to destroy all 3 pools */
-				diagmem_exit(driver, POOL_TYPE_COPY);
-				diagmem_exit(driver, POOL_TYPE_HDLC);
-				diagmem_exit(driver, POOL_TYPE_WRITE_STRUCT);
-		for (i = 0; i < driver->num_clients; i++)
-					if (driver->client_map[i].pid ==
-					     current->tgid) {
-				driver->client_map[i].pid = 0;
-				break;
-			}
-		mutex_unlock(&driver->diagchar_mutex);
-		return 0;
+	for (i = 0; i < diag_max_registration; i++) {
+		if (driver->table[i].process_id == current->tgid)
+			driver->table[i].process_id = 0;
 	}
-	return -ENOMEM;
+
+	mutex_lock(&driver->diagchar_mutex);
+	driver->ref_count--;
+			/* On Client exit, try to destroy all 3 pools */
+			diagmem_exit(driver, POOL_TYPE_COPY);
+			diagmem_exit(driver, POOL_TYPE_HDLC);
+			diagmem_exit(driver, POOL_TYPE_WRITE_STRUCT);
+	for (i = 0; i < driver->num_clients; i++) {
+		if (driver->client_map[i].pid == current->tgid) {
+			driver->client_map[i].pid = 0;
+			break;
+		}
+	}
+	mutex_unlock(&driver->diagchar_mutex);
+	return 0;
 }
 
 static int diagchar_ioctl(struct inode *inode, struct file *filp,
@@ -249,6 +262,7 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 {
 	int i, j, count_entries = 0, temp;
 	int success = -1;
+	void *temp_buf;
 
 	DIAG_INFO("%s:%s(parent:%s): tgid=%d\n", __func__,
 	current->comm, current->parent->comm, current->tgid);
@@ -284,9 +298,12 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			if (diag_max_registration > diag_threshold_registration)
 				diag_max_registration =
 						 diag_threshold_registration;
-			driver->table = krealloc(driver->table,
+			temp_buf = krealloc(driver->table,
 					 diag_max_registration*sizeof(struct
 					 diag_master_table), GFP_KERNEL);
+			BUG_ON(!temp_buf);
+			driver->table = temp_buf;
+
 			for (j = i; j < diag_max_registration; j++) {
 				success = 1;
 				driver->table[j].cmd_code = pkt_params->

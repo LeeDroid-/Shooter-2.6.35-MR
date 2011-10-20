@@ -894,7 +894,7 @@ wl_iw_set_country(
 	memset(country_code, 0, sizeof(country_code));
 
 #ifdef HTC_KlocWork
-	memset(&ci,0,sizeof(ci));
+    memset(&ci,0,sizeof(ci));
 #endif
 	
 	country_offset = strcspn(extra, " ");
@@ -2043,7 +2043,22 @@ exit_proc:
 
 /* traffic indicate parameters */
 /* framework will obtain RSSI every 3000 ms*/
-#define TRAFFIC_HIGH_WATER_MARK	        2560 *(3000/1000)
+/* The throughput mapping to packet count is as below:
+ *  2Mbps: ~280 packets / second
+ *  4Mbps: ~540 packets / second
+ *  6Mbps: ~800 packets / second
+ *  8Mbps: ~1200 packets / second
+ * 12Mbps: ~1500 packets / second
+ * 14Mbps: ~1800 packets / second
+ * 16Mbps: ~2000 packets / second
+ * 18Mbps: ~2300 packets / second
+ * 20Mbps: ~2600 packets / second
+ */
+#ifdef CONFIG_MACH_LEAD
+#define TRAFFIC_HIGH_WATER_MARK	        1500 *(3000/1000)
+#else
+#define TRAFFIC_HIGH_WATER_MARK	        2300 *(3000/1000)
+#endif
 #define TRAFFIC_LOW_WATER_MARK          256 * (3000/1000)
 typedef enum traffic_ind {
 	TRAFFIC_STATS_HIGH = 0,
@@ -2144,7 +2159,7 @@ wl_iw_send_priv_event(
 		return -1;
 
 #ifdef HTC_KlocWork
-	strncpy(extra, flag, IW_CUSTOM_MAX + 1);
+    strncpy(extra, flag, IW_CUSTOM_MAX + 1);
 #else
 	strcpy(extra, flag);
 #endif
@@ -2873,7 +2888,7 @@ wl_iw_config_commit(
 	int error;
 	struct sockaddr bssid;
 #ifdef HTC_KlocWork
-	memset(&ssid,0,sizeof(ssid));
+    memset(&ssid,0,sizeof(ssid));
 #endif
 	WL_TRACE(("%s: SIOCSIWCOMMIT\n", dev->name));
 
@@ -2972,7 +2987,7 @@ wl_iw_get_freq(
 	channel_info_t ci;
 	int error;
 #ifdef HTC_KlocWork
-	memset(&ci,0,sizeof(ci));
+    memset(&ci,0,sizeof(ci));
 #endif
 	WL_TRACE(("%s: SIOCGIWFREQ\n", dev->name));
 
@@ -3059,7 +3074,7 @@ wl_iw_get_range(
 	int error, i, k;
 	uint sf, ch;
 
-	int phytype = 0; /* HTC_KlocWork */
+	int phytype = 0; //HTC_KlocWork
 	int bw_cap = 0, sgi_tx = 0, nmode = 0;
 	channel_info_t ci;
 	uint8 nrate_list2copy = 0;
@@ -3070,8 +3085,8 @@ wl_iw_get_range(
 
 	WL_TRACE(("%s: SIOCGIWRANGE\n", dev->name));
 #ifdef HTC_KlocWork
-	memset(&rateset,0,sizeof(rateset));
-	memset(&ci,0,sizeof(ci));
+    memset(&rateset,0,sizeof(rateset));
+    memset(&ci,0,sizeof(ci));
 #endif
 	if (!extra)
 		return -EINVAL;
@@ -3135,7 +3150,7 @@ wl_iw_get_range(
 	rateset.count = dtoh32(rateset.count);
 	range->num_bitrates = rateset.count;
 #ifdef HTC_KlocWork
-	for (i = 0; i < rateset.count && i < WL_NUMRATES; i++)
+    for (i = 0; i < rateset.count && i < WL_NUMRATES; i++)
 #else
 	for (i = 0; i < rateset.count && i < IW_MAX_BITRATES; i++)
 #endif
@@ -3585,7 +3600,7 @@ wl_iw_iscan_get_aplist(
 	wl_bss_info_t *bi = NULL;
 	int i;
 #ifdef HTC_KlocWork
-	memset(&qual,0,sizeof(qual));
+    memset(&qual,0,sizeof(qual));
 #endif
 	WL_TRACE(("%s: SIOCGIWAPLIST\n", dev->name));
 
@@ -3643,11 +3658,11 @@ wl_iw_iscan_get_aplist(
 	}
 	if (dwrq->length) {
 #ifdef HTC_KlocWork
-		int cpylen = sizeof(struct iw_quality) * dwrq->length;
-		if ( cpylen > sizeof(qual))
-			cpylen = sizeof(qual);
+        int cpylen = sizeof(struct iw_quality) * dwrq->length;
+        if( cpylen > sizeof(qual))
+            cpylen = sizeof(qual);
 
-		memcpy(&addr[dwrq->length], qual, cpylen);
+        memcpy(&addr[dwrq->length], qual, cpylen);
 #else
 		memcpy(&addr[dwrq->length], qual, sizeof(struct iw_quality) * dwrq->length);
 #endif
@@ -5104,8 +5119,7 @@ wl_iw_iscan_get_scan(
 			
 			iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
 #ifdef HTC_KlocWork
-			for (j = 0; j < bi->rateset.count &&
-			j < WL_NUMRATES; j++) {
+            for (j = 0; j < bi->rateset.count && j < WL_NUMRATES; j++) {
 #else
 			for (j = 0; j < bi->rateset.count && j < IW_MAX_BITRATES; j++) {
 #endif
@@ -5209,7 +5223,7 @@ wl_iw_get_essid(
 	wlc_ssid_t ssid;
 	int error;
 #ifdef HTC_KlocWork
-	memset(&ssid, 0, sizeof(ssid));
+    memset(&ssid, 0, sizeof(ssid));
 #endif
 	WL_TRACE(("%s: SIOCGIWESSID\n", dev->name));
 
@@ -5254,7 +5268,7 @@ wl_iw_set_nick(
 
 	memcpy(iw->nickname, extra, dwrq->length);
 #ifdef HTC_KlocWork
-	if(dwrq->length >= 1)
+    if(dwrq->length >= 1)
 #endif
 	iw->nickname[dwrq->length - 1] = '\0';
 
@@ -5295,7 +5309,7 @@ static int wl_iw_set_rate(
 	WL_TRACE(("%s: SIOCSIWRATE\n", dev->name));
 
 #ifdef HTC_KlocWork
-	memset(&rateset,0,sizeof(rateset));
+    memset(&rateset,0,sizeof(rateset));
 #endif
 	
 	if ((error = dev_wlc_ioctl(dev, WLC_GET_CURR_RATESET, &rateset, sizeof(rateset))))
@@ -5352,7 +5366,7 @@ static int wl_iw_get_rate(
 	char *extra
 )
 {
-	int error=0, rate=0; /* HTC_KlocWork */
+	int error=0, rate=0; //HTC_KlocWork
 
 	WL_TRACE(("%s: SIOCGIWRATE\n", dev->name));
 
@@ -5507,7 +5521,7 @@ wl_iw_get_txpow(
 	char *extra
 )
 {
-	int error, disable = 0, txpwrdbm; /* HTC_KlocWork */
+	int error, disable=0, txpwrdbm; //HTC_KlocWork
 	uint8 result;
 
 	WL_TRACE(("%s: SIOCGIWTXPOW\n", dev->name));
@@ -5581,7 +5595,7 @@ wl_iw_get_retry(
 	char *extra
 )
 {
-	int error, lrl = 0, srl = 0; /* HTC_KlocWork */
+	int error, lrl=0, srl=0; //HTC_KlocWork
 
 	WL_TRACE(("%s: SIOCGIWRETRY\n", dev->name));
 
@@ -5718,7 +5732,7 @@ wl_iw_get_encode(
 )
 {
 	wl_wsec_key_t key;
-	int error, val, wsec = 0, auth = 0; /* HTC_KlocWork */
+	int error, val, wsec=0, auth=0; //HTC_KlocWork
 
 	WL_TRACE(("%s: SIOCGIWENCODE\n", dev->name));
 
@@ -5801,7 +5815,7 @@ wl_iw_get_power(
 	char *extra
 )
 {
-	int error, pm = 0; /* HTC_KlocWork */
+	int error, pm=0; //HTC_KlocWork
 
 	WL_TRACE(("%s: SIOCGIWPOWER\n", dev->name));
 
@@ -6673,7 +6687,7 @@ wl_iw_combined_scan_set(struct net_device *dev, wlc_ssid_t* ssids_local, int nss
 	WL_TRACE(("%s nssid=%d nchan=%d\n", __FUNCTION__, nssid, nchan));
 
 #ifdef HTC_KlocWork
-	if ((!dev) || (!g_iscan) || (!iscan->iscan_ex_params_p)) {
+    if ((!dev) || (!g_iscan) || (!iscan->iscan_ex_params_p)) {
 #else
 	if ((!dev) && (!g_iscan) && (!iscan->iscan_ex_params_p)) {
 #endif
@@ -7296,6 +7310,7 @@ static int set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 		WL_SOFTAP(("	key = '%s'\n", ap->key));
 	WL_SOFTAP(("	channel = %d\n", ap->channel));
 	WL_SOFTAP(("	max scb = %d\n", ap->max_scb));
+	WL_SOFTAP(("	hidden = %d\n", ap->closednet));
 
 	iw = *(wl_iw_t **)netdev_priv(dev);
 	MUTEX_LOCK_SOFTAP_SET(iw->pub);
@@ -7703,7 +7718,7 @@ int get_parmeter_from_string(
 			int param_type, void  *dst, int param_max_len)
 {
 	char int_str[7] = "0";
-	int parm_str_len = 0; /* HTC_KlocWork */
+	int parm_str_len=0; //HTC_KlocWork
 	char  *param_str_begin;
 	char  *param_str_end;
 
@@ -7715,7 +7730,7 @@ int get_parmeter_from_string(
 
 		if (*str_ptr == NULL) {
 #ifdef HTC_KlocWork
-			if (param_str_begin != NULL)
+            if(param_str_begin != NULL)
 #endif
 			parm_str_len = strlen(param_str_begin);
 		} else {
@@ -7753,7 +7768,7 @@ int get_parmeter_from_string(
 				
 				param_max_len = param_max_len >> 1;  
 #ifdef HTC_KlocWork
-			if (param_str_begin != NULL)
+			if(param_str_begin != NULL)
 #endif
 				hstr_2_buf(param_str_begin, buf, param_max_len);
 				print_buf(buf, param_max_len, 0);

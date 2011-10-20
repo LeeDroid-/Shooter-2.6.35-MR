@@ -37,7 +37,7 @@
  */
 
 /* big enough to hold our biggest descriptor */
-#define USB_BUFSIZ	512
+#define USB_BUFSIZ	4096
 
 static struct usb_composite_driver *composite;
 
@@ -204,6 +204,7 @@ int usb_add_function(struct usb_configuration *config,
 	function->config = config;
 	list_add_tail(&function->list, &config->functions);
 
+#ifndef CONFIG_USB_GADGET_DYNAMIC_ENDPOINT
 	/* REVISIT *require* function->bind? */
 	if (function->bind) {
 		value = function->bind(config, function);
@@ -223,6 +224,23 @@ int usb_add_function(struct usb_configuration *config,
 		config->fullspeed = true;
 	if (!config->highspeed && function->hs_descriptors)
 		config->highspeed = true;
+#else
+	if (!strcmp(function->name, "usb_mass_storage") && function->bind) {
+		value = function->bind(config, function);
+		if (value < 0) {
+			list_del(&function->list);
+			function->config = NULL;
+		}
+	} else {
+		/* Skip bind here */
+		function->hidden = 1;
+	}
+
+	if (!config->fullspeed)
+		config->fullspeed = true;
+	if (!config->highspeed)
+		config->highspeed = true;
+#endif
 
 done:
 	if (value)
@@ -577,9 +595,13 @@ static void reset_config(struct usb_composite_dev *cdev)
 	DBG(cdev, "reset config\n");
 
 	list_for_each_entry(f, &cdev->config->functions, list) {
+#ifdef CONFIG_USB_GADGET_DYNAMIC_ENDPOINT
+		if (f->disable && !f->hidden)
+			f->disable(f);
+#else
 		if (f->disable)
 			f->disable(f);
-
+#endif
 		bitmap_zero(f->endpoints, 32);
 	}
 	cdev->config = NULL;
@@ -641,6 +663,14 @@ static int set_config(struct usb_composite_dev *cdev,
 			reset_config(cdev);
 			goto done;
 		}
+		if (result == USB_GADGET_DELAYED_STATUS) {
+			DBG(cdev,
+					"%s: interface %d (%s) requested delayed status\n",
+					__func__, tmp, f->name);
+			cdev->delayed_status++;
+			DBG(cdev, "delayed_status count %d\n",
+					cdev->delayed_status);
+		}
 		interfaceCount++;
 	}
 
@@ -648,6 +678,8 @@ static int set_config(struct usb_composite_dev *cdev,
 	power = c->bMaxPower ? (2 * c->bMaxPower) : CONFIG_USB_GADGET_VBUS_DRAW;
 done:
 	usb_gadget_vbus_draw(gadget, power);
+	if (result >= 0 && cdev->delayed_status)
+		result = USB_GADGET_DELAYED_STATUS;
 
 	/* only if configured, send event (for GB USB-IF) */
 	if (c)
@@ -1010,6 +1042,14 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		if (w_value && !f->set_alt)
 			break;
 		value = f->set_alt(f, w_index, w_value);
+		if (value == USB_GADGET_DELAYED_STATUS) {
+			DBG(cdev,
+			 "%s: interface %d (%s) requested delayed status\n",
+					__func__, intf, f->name);
+			cdev->delayed_status++;
+			DBG(cdev, "delayed_status count %d\n",
+					cdev->delayed_status);
+		}
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
@@ -1083,7 +1123,7 @@ unknown:
 	}
 
 	/* respond with data transfer before status phase? */
-	if (value >= 0) {
+	if (value >= 0 && value != USB_GADGET_DELAYED_STATUS) {
 		req->length = value;
 		req->zero = value < w_length;
 		value = usb_ep_queue(gadget->ep0, req, GFP_ATOMIC);
@@ -1092,6 +1132,10 @@ unknown:
 			req->status = 0;
 			composite_setup_complete(gadget->ep0, req);
 		}
+	} else if (value == USB_GADGET_DELAYED_STATUS && w_length != 0) {
+		WARN(cdev,
+			"%s: Delayed status not supported for w_length != 0",
+			__func__);
 	}
 
 done:
@@ -1191,7 +1235,6 @@ composite_unbind(struct usb_gadget *gadget)
 
 	switch_dev_unregister(&cdev->sw_connected);
 	switch_dev_unregister(&cdev->sw_config);
-	switch_dev_unregister(&cdev->sw_connect2pc);
 	kfree(cdev);
 	set_gadget_data(gadget, NULL);
 	device_remove_file(&gadget->dev, &dev_attr_suspended);
@@ -1244,7 +1287,7 @@ composite_switch_work(struct work_struct *data)
 	else
 		switch_set_state(&cdev->sw_config, 0);
 	printk(KERN_INFO "set usb_configuration = %d\n",
-		    config ? config->bConfigurationValue : 0);
+			config ? config->bConfigurationValue : 0);
 
 	if (connect2pc == 1) {
 		if (!cdev->connected && !config) {
@@ -1263,9 +1306,8 @@ composite_switch_work(struct work_struct *data)
 
 static void composite_func_enable_event(struct usb_composite_dev *cdev)
 {
-	/* send 0 here to let usb_configuration toggle */
 	switch_set_state(&cdev->sw_config, 0);
-	printk(KERN_INFO "func_enable: set usb_configuration = 0\n");
+	printk(KERN_INFO "set usb_configuration = 0\n");
 }
 
 static int composite_bind(struct usb_gadget *gadget)
@@ -1497,3 +1539,40 @@ void usb_composite_unregister(struct usb_composite_driver *driver)
 	switch_dev_unregister(&compositesdev);
 	usb_gadget_unregister_driver(&composite_driver);
 }
+
+/**
+ * usb_composite_setup_continue() - Continue with the control transfer
+ * @cdev: the composite device who's control transfer was kept waiting
+ *
+ * This function must be called by the USB function driver to continue
+ * with the control transfer's data/status stage in case it had requested to
+ * delay the data/status stages. A USB function's setup handler (e.g. set_alt())
+ * can request the composite framework to delay the setup request's data/status
+ * stages by returning USB_GADGET_DELAYED_STATUS.
+ */
+void usb_composite_setup_continue(struct usb_composite_dev *cdev)
+{
+	int			value;
+	struct usb_request	*req = cdev->req;
+	unsigned long		flags;
+
+	DBG(cdev, "%s\n", __func__);
+	spin_lock_irqsave(&cdev->lock, flags);
+
+	if (cdev->delayed_status == 0) {
+		WARN(cdev, "%s: Unexpected call\n", __func__);
+
+	} else if (--cdev->delayed_status == 0) {
+		DBG(cdev, "%s: Completing delayed status\n", __func__);
+		req->length = 0;
+		value = usb_ep_queue(cdev->gadget->ep0, req, GFP_ATOMIC);
+		if (value < 0) {
+			DBG(cdev, "ep_queue --> %d\n", value);
+			req->status = 0;
+			composite_setup_complete(cdev->gadget->ep0, req);
+		}
+	}
+
+	spin_unlock_irqrestore(&cdev->lock, flags);
+}
+

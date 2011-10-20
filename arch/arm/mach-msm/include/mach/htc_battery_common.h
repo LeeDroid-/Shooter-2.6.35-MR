@@ -48,5 +48,6 @@ enum charger_control_flag {
 /* interface function declaration */
 
 int htc_battery_charger_disable(void);
+int htc_battery_get_zcharge_mode(void);
 
 #endif

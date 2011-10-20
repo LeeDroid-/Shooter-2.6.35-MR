@@ -232,6 +232,25 @@ static char *usb_functions_acm[] = {
 #endif
 
 
+static char *usb_functions_adb_diag_modem_svlte2_rment[] = {
+	"usb_mass_storage",
+	"adb",
+	"diag",
+	"modem",
+	"modem_mdm",
+	"diag_mdm",
+	"rmnet",
+};
+
+static char *usb_functions_diag_modem_svlte2_rment[] = {
+	"usb_mass_storage",
+	"diag",
+	"modem",
+	"modem_mdm",
+	"diag_mdm",
+	"rmnet",
+};
+
 #ifdef CONFIG_USB_ANDROID_RMNET_SDIO
 static char *usb_functions_adb_diag_modem_rment[] = {
 	"usb_mass_storage",
@@ -633,6 +652,18 @@ static struct android_usb_product usb_products[] = {
 		.functions	= usb_functions_rment,
 	},
 #endif
+
+
+	{
+		.product_id	= 0x0fcf,
+		.num_functions	= ARRAY_SIZE(usb_functions_adb_diag_modem_svlte2_rment),
+		.functions	= usb_functions_adb_diag_modem_svlte2_rment,
+	},
+	{
+		.product_id	= 0x0fd0,
+		.num_functions	= ARRAY_SIZE(usb_functions_diag_modem_svlte2_rment),
+		.functions	= usb_functions_diag_modem_svlte2_rment,
+	},
 };
 #endif /* CONFIG_USB_ANDROID */
 

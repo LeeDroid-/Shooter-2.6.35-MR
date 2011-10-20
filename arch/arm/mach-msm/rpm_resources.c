@@ -122,7 +122,7 @@ static struct msm_rpmrs_resource msm_rpmrs_vdd_mem = {
 	.beyond_limits = msm_rpmrs_vdd_mem_beyond_limits,
 	.aggregate = msm_rpmrs_aggregate_vdd_mem,
 	.restore = msm_rpmrs_restore_vdd_mem,
-	.enable_low_power = 2,
+	.enable_low_power = 2 ,
 };
 
 static struct msm_rpmrs_resource msm_rpmrs_vdd_dig = {

@@ -835,7 +835,7 @@ static int kgsl_yamato_start(struct kgsl_device *device, unsigned int init_ram)
 
 
 	if (device->chip_id != KGSL_CHIPID_LEIA_REV470){
-		kgsl_yamato_regwrite(device, REG_RBBM_PM_OVERRIDE1, 0);
+	kgsl_yamato_regwrite(device, REG_RBBM_PM_OVERRIDE1, 0);
 		kgsl_yamato_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0);
 	}
 	else{
@@ -1282,9 +1282,9 @@ static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 		pwr->io_count = (pwr->io_count + 1) % 100;
 		if (pwr->io_count < pwr->io_fraction ||
 				 pwr->io_fraction == 100) {
-			status = kgsl_wait_io_event_interruptible_timeout(
-					yamato_device->ib1_wq,
-					kgsl_check_interrupt_timestamp(device,
+		status = kgsl_wait_io_event_interruptible_timeout(
+				yamato_device->ib1_wq,
+				kgsl_check_interrupt_timestamp(device,
 					timestamp), msecs_to_jiffies(msecs));
 		} else {
 			status = kgsl_wait_event_interruptible_timeout(

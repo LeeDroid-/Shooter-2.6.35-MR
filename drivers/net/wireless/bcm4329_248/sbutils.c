@@ -411,10 +411,10 @@ sb_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
 	}
 	ASSERT(r != NULL);
 #ifdef HTC_KlocWork
-	if (r == NULL) {
-		SI_ERROR(("[HTCKW] sb_corereg: r is NULL\n"));
-		return 0;
-	}
+    if(r == NULL) {
+        SI_ERROR(("[HTCKW] sb_corereg: r is NULL\n"));
+        return 0;
+    }
 #endif
 	/* mask and set */
 	if (mask || val) {
@@ -497,9 +497,9 @@ _sb_scan(si_info_t *sii, uint32 sba, void *regs, uint bus, uint32 sbba, uint num
 			uint32 ccrev = sb_corerev(&sii->pub);
 
 			/* determine numcores - this is the total # cores in the chip */
-			if (((ccrev == 4) || (ccrev >= 6))) {
+			if (((ccrev == 4) || (ccrev >= 6))){
 #ifdef HTC_KlocWork
-				if (cc != NULL)
+				if(cc != NULL)
 #endif
 				numcores = (R_REG(sii->osh, &cc->chipid) & CID_CC_MASK) >>
 				        CID_CC_SHIFT;
@@ -742,11 +742,11 @@ sb_commit(si_t *sih)
 		chipcregs_t *ccregs = (chipcregs_t *)si_setcore(sih, CC_CORE_ID, 0);
 
 #ifdef HTC_KlocWork
-		if (ccregs != NULL) {
-			/* do the buffer registers update */
-			W_REG(sii->osh, &ccregs->broadcastaddress, SB_COMMIT);
-			W_REG(sii->osh, &ccregs->broadcastdata, 0x0);
-		}
+        if(ccregs != NULL) {
+            /* do the buffer registers update */
+            W_REG(sii->osh, &ccregs->broadcastaddress, SB_COMMIT);
+            W_REG(sii->osh, &ccregs->broadcastdata, 0x0);
+        }
 #else
 		/* do the buffer registers update */
 		W_REG(sii->osh, &ccregs->broadcastaddress, SB_COMMIT);

@@ -99,10 +99,14 @@ struct usb_ether_platform_data {
 	const char *vendorDescr;
 };
 
+#if defined(CONFIG_MACH_HOLIDAY)
+extern u8 in_usb_tethering;
+#endif
+
 extern void android_register_function(struct android_usb_function *f);
 extern int android_get_model_id(void);
 extern void android_enable_function(struct usb_function *f, int enable);
 extern int android_switch_function(unsigned func);
-
+extern unsigned android_switch_sum(void);
 
 #endif	/* __LINUX_USB_ANDROID_H */

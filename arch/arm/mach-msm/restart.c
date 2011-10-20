@@ -297,6 +297,12 @@ void arch_reset(char mode, const char *cmd)
 			printk(KERN_NOTICE "%s: modem flushes cache timeout.\n", __func__);
 	}
 
+/* Added by HTC for forcing mdm9K to do the cache flush */
+#if defined(CONFIG_ARCH_MSM8X60_LTE)
+	if (mode == RESTART_MODE_MODEM_CRASH)
+		charm_panic_wait_mdm_shutdown();
+#endif
+
 	msm_pm_flush_console();
 
 	secure_writel(0, PSHOLD_CTL_SU); /* Actually reset the chip */

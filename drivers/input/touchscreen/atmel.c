@@ -535,7 +535,7 @@ static ssize_t atmel_unlock_store(struct device *dev,
 
 	printk(KERN_INFO "Touch: unlock change to %d\n", unlock);
 
-	if (unlock == 2 && ts_data->id->version >= 0x20 &&
+	if ((unlock == 2 || unlock == 3) && ts_data->id->version >= 0x20 &&
 		(ts_data->first_pressed || ts_data->finger_count) &&
 		ts_data->pre_data[0] < RECALIB_UNLOCK &&
 		ts_data->unlock_attr) {

@@ -368,7 +368,10 @@ static inline void __set_irq_handler_unlocked(int irq,
 	struct irq_desc *desc;
 
 	desc = irq_to_desc(irq);
-	desc->handle_irq = handler;
+	if (likely(desc))
+		desc->handle_irq = handler;
+	else
+		printk(KERN_ERR "[%s] Invalid IRQ(%d)\n", __func__, irq);
 }
 
 /*

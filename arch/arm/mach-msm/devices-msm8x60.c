@@ -175,6 +175,35 @@ struct platform_device msm_device_uart3 = {
 };
 #endif
 
+#ifdef CONFIG_WIMAX_SERIAL_MSM_HS
+static struct resource msm_uart3_dm_resources[] = {
+	{
+		.start = MSM_UART3DM_PHYS,
+		.end   = MSM_UART3DM_PHYS + PAGE_SIZE - 1,
+		.name  = "uartdm_resource",
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = INT_UART3DM_IRQ,
+		.end   = INT_UART3DM_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = MSM_GSBI3_PHYS,
+		.end   = MSM_GSBI3_PHYS + PAGE_SIZE - 1,
+		.name  = "gsbi_resource",
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm_device_uart3 = {
+	.name = "msm_serial_hsl_wimax",
+	.id = 2,
+	.num_resources = ARRAY_SIZE(msm_uart3_dm_resources),
+	.resource = msm_uart3_dm_resources,
+};
+#endif
+
 static struct resource msm_uart1_dm_resources[] = {
 	{
 		.start = MSM_UART1DM_PHYS,
@@ -474,6 +503,55 @@ static struct resource gsbi12_qup_i2c_resources[] = {
 	},
 };
 
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+static struct resource kgsl_3d0_resources[] = {
+	{
+		.name = KGSL_3D0_REG_MEMORY,
+		.start = 0x04300000, /* GFX3D address */
+		.end = 0x0431ffff,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name = KGSL_3D0_IRQ,
+		.start = GFX3D_IRQ,
+		.end = GFX3D_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+#ifdef CONFIG_MSM_KGSL_2D
+static struct resource kgsl_2d0_resources[] = {
+	{
+		.name = KGSL_2D0_REG_MEMORY,
+		.start = 0x04100000, /* Z180 base address */
+		.end = 0x04100FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = KGSL_2D0_IRQ,
+		.start = GFX2D0_IRQ,
+		.end = GFX2D0_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct resource kgsl_2d1_resources[] = {
+	{
+		.name = KGSL_2D1_REG_MEMORY,
+		.start = 0x04200000, /* Z180 device 1 base address */
+		.end =   0x04200FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = KGSL_2D1_IRQ,
+		.start = GFX2D1_IRQ,
+		.end = GFX2D1_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+#endif
+
+#else  // CONFIG_MSM_KGSL_HC_MR1
 
 static struct resource kgsl_resources[] = {
 	{
@@ -515,6 +593,8 @@ static struct resource kgsl_resources[] = {
 
 };
 
+#endif	// CONFIG_MSM_KGSL_HC_MR1
+
 #ifdef CONFIG_MSM_BUS_SCALING
 static struct msm_bus_vectors grp3d_init_vectors[] = {
 	{
@@ -525,12 +605,29 @@ static struct msm_bus_vectors grp3d_init_vectors[] = {
 	},
 };
 
-static struct msm_bus_vectors grp3d_max_vectors[] = {
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+static struct msm_bus_vectors grp3d_nominal_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
+		.ib = 200800000U,
+	},
+};
+#endif
+
+static struct msm_bus_vectors grp3d_max_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_GRAPHICS_3D,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+		.ab = 0,
+		// .ib = 200800000U,
+		.ib = 2096000000U,		// HTC: Raise up bw due to avoid underrun
+#else
+		.ab = 0,
 		.ib = 2096000000U,
+#endif
 	},
 };
 
@@ -539,6 +636,12 @@ static struct msm_bus_paths grp3d_bus_scale_usecases[] = {
 		ARRAY_SIZE(grp3d_init_vectors),
 		grp3d_init_vectors,
 	},
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+	{
+		ARRAY_SIZE(grp3d_nominal_vectors),
+		grp3d_nominal_vectors,
+	},
+#endif
 	{
 		ARRAY_SIZE(grp3d_max_vectors),
 		grp3d_max_vectors,
@@ -564,8 +667,14 @@ static struct msm_bus_vectors grp2d0_max_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+		.ab = 0,
+		// .ib = 248000000,
+		.ib = 2096000000U,	// HTC:
+#else
 		.ab = 0,
 		.ib = 2096000000U,
+#endif
 	},
 };
 
@@ -599,8 +708,14 @@ static struct msm_bus_vectors grp2d1_max_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE1,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+		.ab = 0,
+		// .ib = 248000000,		
+		.ib = 2096000000U,		// HTC
+#else
 		.ab = 0,
 		.ib = 2096000000U,
+#endif
 	},
 };
 
@@ -622,20 +737,163 @@ struct msm_bus_scale_pdata grp2d1_bus_scale_pdata = {
 };
 #endif
 
-#ifdef CONFIG_HW_RANDOM_MSM
-static struct resource rng_resources = {
-	.flags = IORESOURCE_MEM,
-	.start = MSM_PRNG_PHYS,
-	.end   = MSM_PRNG_PHYS + SZ_512 - 1,
+#ifdef CONFIG_MSM_KGSL_HC_MR1
+
+static struct kgsl_device_platform_data kgsl_3d0_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 266667000,
+				.bus_freq = 2,
+			},
+			{
+				.gpu_freq = 228571000,
+				.bus_freq = 1,
+			},
+			{
+				.gpu_freq = 266667000,
+				.bus_freq = 0,
+			},
+		},
+		.init_level = 0,
+		.num_levels = 3,
+		.set_grp_async = NULL,
+		.idle_timeout = HZ/5,
+#ifdef CONFIG_MSM_BUS_SCALING
+		.nap_allowed = true,
+#endif
+		.pwrrail_first = true,
+	},
+	.clk = {
+		.name = {
+			.clk = "gfx3d_clk",
+			.pclk = "gfx3d_pclk",
+		},
+#ifdef CONFIG_MSM_BUS_SCALING
+		.bus_scale_table = &grp3d_bus_scale_pdata,
+#endif
+	},
+	.imem_clk_name = {
+		.clk = NULL,
+		.pclk = "imem_pclk",
+	},
 };
 
-struct platform_device msm_device_rng = {
-	.name          = "msm_rng",
-	.id            = 0,
-	.num_resources = 1,
-	.resource      = &rng_resources,
+struct platform_device msm_kgsl_3d0 = {
+	.name = "kgsl-3d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_3d0_resources),
+	.resource = kgsl_3d0_resources,
+	.dev = {
+		.platform_data = &kgsl_3d0_pdata,
+	},
 };
+
+#if CONFIG_MSM_KGSL_2D
+
+static struct kgsl_device_platform_data kgsl_2d0_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 228571000,
+				.bus_freq = 1,
+			},
+			{
+				.gpu_freq = 228571000,
+				.bus_freq = 0,
+			},
+		},
+		.init_level = 0,
+		.num_levels = 2,
+		.set_grp_async = NULL,
+		.idle_timeout = HZ/10,
+#ifdef CONFIG_MSM_BUS_SCALING
+		.nap_allowed = true,
 #endif
+		.pwrrail_first = true,
+	},
+	.clk = {
+		.name = {
+			/* note: 2d clocks disabled on v1 */
+			.clk = "gfx2d0_clk",
+			.pclk = "gfx2d0_pclk",
+		},
+#ifdef CONFIG_MSM_BUS_SCALING
+		.bus_scale_table = &grp2d0_bus_scale_pdata,
+#endif
+	},
+};
+
+struct platform_device msm_kgsl_2d0 = {
+	.name = "kgsl-2d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_2d0_resources),
+	.resource = kgsl_2d0_resources,
+	.dev = {
+		.platform_data = &kgsl_2d0_pdata,
+	},
+};
+
+static struct kgsl_device_platform_data kgsl_2d1_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 228571000,
+				.bus_freq = 1,
+			},
+			{
+				.gpu_freq = 228571000,
+				.bus_freq = 0,
+			},
+		},
+		.init_level = 0,
+		.num_levels = 2,
+		.set_grp_async = NULL,
+		.idle_timeout = HZ/10,
+#ifdef CONFIG_MSM_BUS_SCALING
+		.nap_allowed = true,
+#endif
+		.pwrrail_first = true,
+	},
+	.clk = {
+		.name = {
+			.clk = "gfx2d1_clk",
+			.pclk = "gfx2d1_pclk",
+		},
+#ifdef CONFIG_MSM_BUS_SCALING
+		.bus_scale_table = &grp2d1_bus_scale_pdata,
+#endif
+	},
+};
+
+struct platform_device msm_kgsl_2d1 = {
+	.name = "kgsl-2d1",
+	.id = 1,
+	.num_resources = ARRAY_SIZE(kgsl_2d1_resources),
+	.resource = kgsl_2d1_resources,
+	.dev = {
+		.platform_data = &kgsl_2d1_pdata,
+	},
+};
+
+/*
+ * this a software workaround for not having two distinct board
+ * files for 8660v1 and 8660v2. 8660v1 has a faulty 2d clock, and
+ * this workaround detects the cpu version to tell if the kernel is on a
+ * 8660v1, and should disable the 2d core. it is called from the board file
+ */
+ void __init msm8x60_check_2d_hardware(void)
+{
+	if ((SOCINFO_VERSION_MAJOR(socinfo_get_version()) == 1) &&
+	    (SOCINFO_VERSION_MINOR(socinfo_get_version()) == 0)) {
+		printk(KERN_WARNING "kgsl: 2D cores disabled on 8660v1\n");
+		kgsl_2d0_pdata.clk.name.clk = NULL;
+		kgsl_2d1_pdata.clk.name.clk = NULL;
+	}
+}
+#endif
+
+#else  // CONFIG_MSM_KGSL_HC_MR1
 
 struct kgsl_platform_data kgsl_pdata = {
 #ifdef CONFIG_MSM_NPA_SYSTEM_BUS
@@ -675,7 +933,11 @@ struct kgsl_platform_data kgsl_pdata = {
 	.nap_allowed = true,
 #endif
 #ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
+	#ifdef CONFIG_ENLARGE_PER_PROCESS_PAGE_TABLE
+	.pt_va_size = SZ_256M-SZ_64K,
+	#else
 	.pt_va_size = SZ_128M,
+	#endif
 	/* Maximum of 32 concurrent processes */
 	.pt_max_count = 30,
 #else
@@ -683,6 +945,16 @@ struct kgsl_platform_data kgsl_pdata = {
 	/* We only ever have one pagetable for everybody */
 	.pt_max_count = 1,
 #endif
+};
+
+struct platform_device msm_device_kgsl = {
+	.name = "kgsl",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(kgsl_resources),
+	.resource = kgsl_resources,
+	.dev = {
+		.platform_data = &kgsl_pdata,
+	},
 };
 
 /*
@@ -701,15 +973,24 @@ void __init msm8x60_check_2d_hardware(void)
 	}
 }
 
-struct platform_device msm_device_kgsl = {
-	.name = "kgsl",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(kgsl_resources),
-	.resource = kgsl_resources,
-	.dev = {
-		.platform_data = &kgsl_pdata,
-	},
+#endif  // CONFIG_MSM_KGSL_HC_MR1
+
+
+
+#ifdef CONFIG_HW_RANDOM_MSM
+static struct resource rng_resources = {
+	.flags = IORESOURCE_MEM,
+	.start = MSM_PRNG_PHYS,
+	.end   = MSM_PRNG_PHYS + SZ_512 - 1,
 };
+
+struct platform_device msm_device_rng = {
+	.name          = "msm_rng",
+	.id            = 0,
+	.num_resources = 1,
+	.resource      = &rng_resources,
+};
+#endif
 
 /* Use GSBI3 QUP for /dev/i2c-0 */
 struct platform_device msm_gsbi3_qup_i2c_device = {
@@ -1661,7 +1942,7 @@ struct platform_device usb_diag_device = {
 #endif
 
 static struct usb_gadget_fserial_platform_data fserial_pdata = {
-	.no_ports	= 1,
+	.no_ports	= 3, /* default are 3 tty */
 };
 
 struct platform_device usb_gadget_fserial_device = {
@@ -1826,6 +2107,9 @@ struct clk_lookup msm_clocks_8x60[] = {
 	CLK_8X60("gsbi_uart_clk",	GSBI3_UART_CLK,	 "msm_serial_hsl.2",
 		OFF),
 #else
+#ifdef CONFIG_WIMAX_SERIAL_MSM_HS
+	CLK_8X60("gsbi_uart_clk",	GSBI3_UART_CLK,	 "msm_serial_hsl_wimax.2", OFF),
+#endif
 	CLK_8X60("gsbi_uart_clk",	GSBI3_UART_CLK,		NULL, OFF),
 #endif
 	CLK_8X60("gsbi_uart_clk",	GSBI4_UART_CLK,		NULL, OFF),

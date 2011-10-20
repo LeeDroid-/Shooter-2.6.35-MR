@@ -77,6 +77,7 @@ obj-$(CONFIG_SERIAL_UARTLITE) += uartlite.o
 obj-$(CONFIG_SERIAL_MSM) += msm_serial.o
 obj-$(CONFIG_MSM_SERIAL_DEBUGGER) += msm_serial_debugger.o
 obj-$(CONFIG_WIMAX_SERIAL_MSM) += msm_serial_wimax.o
+obj-$(CONFIG_WIMAX_SERIAL_MSM_HS) += msm_serial_hs_wimax.o
 obj-$(CONFIG_SERIAL_MSM_HS) += msm_serial_hs.o
 obj-$(CONFIG_SERIAL_MSM_HS) += msm_serial_hs_ti.o
 obj-$(CONFIG_SERIAL_MSM_HS) += msm_serial_hs_ti_dc.o

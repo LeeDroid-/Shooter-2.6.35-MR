@@ -35,6 +35,8 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <mach/msm_rpcrouter.h>
+#include <mach/board_htc.h>
+#include <mach/board.h>
 #ifdef CONFIG_MSM_SDIO_SMEM
 #include <mach/sdio_smem.h>
 #endif
@@ -47,6 +49,31 @@
 #include <mach/mdm.h>
 #include <mach/restart.h>
 #endif
+
+static int rmt_storage_client_debug_mask;
+#if defined(pr_debug)
+#undef pr_debug
+#endif
+#define pr_debug(x...) do {				\
+		if (rmt_storage_client_debug_mask) \
+			printk(KERN_INFO "[RMT] "x);		\
+		else									\
+			printk(KERN_DEBUG "[RMT] "x);		\
+	} while (0)
+
+#if defined(pr_info)
+#undef pr_info
+#endif
+#define pr_info(x...) do {				\
+			printk(KERN_INFO "[RMT] "x);		\
+	} while (0)
+
+#if defined(pr_err)
+#undef pr_err
+#endif
+#define pr_err(x...) do {				\
+			printk(KERN_ERR "[RMT] "x);		\
+	} while (0)
 
 enum {
 	RMT_STORAGE_EVNT_OPEN = 0,
@@ -505,7 +532,10 @@ static int rmt_storage_event_close_cb(struct rmt_storage_event *event_args,
 	close = &event->params.close;
 	event_args->handle = close->handle;
 	event_args->id = RMT_STORAGE_CLOSE;
+	/* spin_lock is added by HTC */
+	spin_lock(&rmc->lock);
 	__clear_bit(event_args->handle, &rmc->cids);
+	spin_unlock(&rmc->lock);
 	rs_client = rmt_storage_get_client(event_args->handle);
 	if (rs_client) {
 		list_del(&rs_client->list);
@@ -553,8 +583,8 @@ static int rmt_storage_event_write_block_cb(
 	if (atomic_inc_return(&rmc->wcount) == 1)
 		wake_lock(&rmc->wlock);
 
-	pr_debug("sec_addr = %u, data_addr = %x, num_sec = %d\n\n",
-		xfer->sector_addr, xfer->data_phy_addr,
+	pr_debug("handle = %d, sec_addr = %u, data_addr = %x, num_sec = %d\n\n",
+		event_args->handle, xfer->sector_addr, xfer->data_phy_addr,
 		xfer->num_sector);
 
 	kfree(event);
@@ -1247,7 +1277,10 @@ static ssize_t rmt_storage_stats_read(struct file *file, char __user *ubuf,
 	struct rmt_storage_stats *stats;
 
 	max = sizeof(buf) - 1;
+	/* spin_lock is added by HTC */
+	spin_lock(&rmc->lock);
 	tot_clients = find_first_zero_bit(&rmc->cids, sizeof(rmc->cids)) - 1;
+	spin_unlock(&rmc->lock);
 
 	for (j = 0; j < tot_clients; j++) {
 		stats = &client_stats[j];
@@ -1707,6 +1740,9 @@ static uint32_t rmt_storage_get_sid(const char *path)
 static int __init rmt_storage_init(void)
 {
 	int ret = 0;
+
+	if (get_kernel_flag() & BIT5)
+		rmt_storage_client_debug_mask = 1;
 
 	rmc = kzalloc(sizeof(struct rmt_storage_client_info), GFP_KERNEL);
 	if (!rmc) {

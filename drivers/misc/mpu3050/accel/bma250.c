@@ -453,8 +453,8 @@ static int bma250_init(void *mlsl_handle,
 			  struct ext_slave_platform_data *pdata)
 {
 	tMLError result;
-	unsigned char reg;
-	unsigned char bw_reg;
+	unsigned char reg = 0;
+	unsigned char bw_reg = 0;
 
 	struct bma250_private_data *private_data;
 	private_data = (struct bma250_private_data *)

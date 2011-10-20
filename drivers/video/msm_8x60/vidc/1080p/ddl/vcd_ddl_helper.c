@@ -451,7 +451,9 @@ struct ddl_client_context *ddl_get_current_ddl_client_for_command(
 u32 ddl_get_yuv_buf_size(u32 width, u32 height, u32 format)
 {
 	u32 mem_size, width_round_up, height_round_up, align;
-
+/*HTC_START Fix Klocwork issue*/
+	align = 0;
+/*HTC_END*/
 	width_round_up  = width;
 	height_round_up = height;
 	if (format == DDL_YUV_BUF_TYPE_TILE) {

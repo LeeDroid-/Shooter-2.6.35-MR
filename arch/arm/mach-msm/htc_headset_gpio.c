@@ -205,6 +205,9 @@ static int htc_headset_gpio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	if (pdata->config_headset_gpio)
+		pdata->config_headset_gpio();
+
 	hi->pdata.hpin_gpio = pdata->hpin_gpio;
 	hi->pdata.key_gpio = pdata->key_gpio;
 	hi->pdata.key_enable_gpio = pdata->key_enable_gpio;

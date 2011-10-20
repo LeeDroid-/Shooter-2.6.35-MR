@@ -17,6 +17,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <asm/setup.h>
+#include <mach/board.h>
 #include <mach/msm_hsusb.h>
 
 struct msm_pmem_setting{
@@ -116,9 +117,9 @@ extern int panel_type;
 extern unsigned engineer_id;
 extern int usb_phy_error;
 
-#if defined(CONFIG_ARCH_MSM8X60)
-unsigned int get_radio_flag(void);
 unsigned int get_kernel_flag(void);
+unsigned int get_radio_flag(void);
+#if defined(CONFIG_ARCH_MSM8X60)
 int msm_fixup(struct tag *tags, struct meminfo *mi);
 #endif
 

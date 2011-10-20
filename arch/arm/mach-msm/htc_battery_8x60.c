@@ -51,9 +51,6 @@ struct early_suspend early_suspend;
 
 static int screen_state;
 
-/* To disable holding wakelock when AC in for suspend test */
-static int ac_suspend_flag;
-
 static int htc_batt_phone_call;
 module_param_named(phone_call, htc_batt_phone_call,
 			int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -122,13 +119,7 @@ static void tps_int_notifier_func(int int_reg, int value)
 {
 	if (int_reg == CHECK_INT1) {
 		htc_batt_info.rep.over_vchg = (unsigned int)value;
-		htc_battery_core_update(BATTERY_SUPPLY);
-	} else if (int_reg == CHECK_INT2) {
-		char message[16] = "REVERSE_CURR=1";
-		char *envp[] = { message, NULL };
-
-		kobject_uevent_env(&htc_batt_info.batt_cable_kobj,
-					KOBJ_CHANGE, envp);
+		htc_battery_core_update_changed();
 	}
 }
 
@@ -215,7 +206,7 @@ static int battery_alarm_notifier_func(struct notifier_block *nfb,
 		if (++htc_batt_timer.batt_critical_alarm_counter >= 3 ) {
 			BATT_LOG("%s: 3V voltage alarm is triggered.", __func__);
 			htc_batt_info.rep.level = 0;
-			htc_battery_core_update(BATTERY_SUPPLY);
+			htc_battery_core_update_changed();
 		}
 		batt_set_voltage_alarm_mode(BATT_ALARM_CRITICAL_MODE);
 	}
@@ -233,12 +224,7 @@ static int battery_alarm_notifier_func(struct notifier_block *nfb,
 
 static void update_wake_lock(int status)
 {
-	/* hold an wakelock when charger connected until disconnected
-		except for AC under test mode(ac_suspend_flag=1). */
-	if (status != CHARGER_BATTERY && !ac_suspend_flag)
-		wake_lock(&htc_batt_info.vbus_wake_lock);
-	else if (status == CHARGER_USB && ac_suspend_flag)
-		/* For suspend test, not hold wake lock when AC in */
+	if (status == CHARGER_USB)
 		wake_lock(&htc_batt_info.vbus_wake_lock);
 	else
 		/* give userspace some time to see the uevent and update
@@ -308,19 +294,24 @@ static int htc_batt_charger_control(enum charger_control_flag control)
 {
 	char message[16] = "CHARGERSWITCH=";
 	char *envp[] = { message, NULL };
+	int ret = 0;
 
 	BATT_LOG("%s: switch charger to mode: %u", __func__, control);
 
-	if (control == STOP_CHARGER)
+	if (control == STOP_CHARGER) {
 		strncat(message, "0", 1);
-	else if (control == ENABLE_CHARGER)
+		kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
+	} else if (control == ENABLE_CHARGER) {
 		strncat(message, "1", 1);
+		kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
+	} else if (control == ENABLE_LIMIT_CHARGER)
+		ret = tps_set_charger_ctrl(ENABLE_LIMITED_CHG);
+	else if (control == DISABLE_LIMIT_CHARGER)
+		ret = tps_set_charger_ctrl(CLEAR_LIMITED_CHG);
 	else
 		return -1;
 
-	kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
-
-	return 0;
+	return ret;
 }
 
 static void htc_batt_set_full_level(int percent)
@@ -565,9 +556,7 @@ static long htc_batt_ioctl(struct file *filp,
 					BATT_ALARM_CRITICAL_MODE);
 		}
 
-		htc_battery_core_update(BATTERY_SUPPLY);
-		htc_battery_core_update(USB_SUPPLY);
-		htc_battery_core_update(AC_SUPPLY);
+		htc_battery_core_update_changed();
 		break;
 	}
 	case HTC_BATT_IOCTL_BATT_DEBUG_LOG:
@@ -794,7 +783,6 @@ static int htc_battery_probe(struct platform_device *pdev)
 	htc_battery_core_ptr->func_get_battery_info = htc_batt_get_battery_info;
 	htc_battery_core_ptr->func_charger_control = htc_batt_charger_control;
 	htc_battery_core_ptr->func_set_full_level = htc_batt_set_full_level;
-	htc_battery_core_ptr->func_is_temperature_fault = NULL;
 	htc_battery_core_register(&pdev->dev, htc_battery_core_ptr);
 
 	htc_batt_info.device_id = pdev->id;
@@ -904,11 +892,6 @@ static int __init htc_battery_init(void)
 	htc_batt_phone_call = 0;
 	htc_battery_initial = 0;
 	htc_full_level_flag = 0;
-
-	ac_suspend_flag = (get_kernel_flag() & 0x2000)?1:0;
-	if (ac_suspend_flag)
-		BATT_LOG("Test mode: ac_suspend_flag is set!");
-
 	spin_lock_init(&htc_batt_info.batt_lock);
 	wake_lock_init(&htc_batt_info.vbus_wake_lock, WAKE_LOCK_SUSPEND,
 			"vbus_present");
@@ -920,7 +903,7 @@ static int __init htc_battery_init(void)
 	platform_driver_register(&htc_battery_driver);
 
 	/* init battery parameters. */
-	htc_batt_info.rep.batt_vol = 3550;
+	htc_batt_info.rep.batt_vol = 3300;
 	htc_batt_info.rep.batt_id = 1;
 	htc_batt_info.rep.batt_temp = 300;
 	htc_batt_info.rep.level = 10;
@@ -929,6 +912,7 @@ static int __init htc_battery_init(void)
 	htc_batt_info.rep.batt_state = 0;
 	htc_batt_info.rep.temp_fault = -1;
 	htc_batt_timer.total_time_ms = 0;
+	htc_batt_timer.batt_system_jiffies = jiffies;
 	htc_batt_timer.batt_alarm_status = 0;
 	htc_batt_timer.alarm_timer_flag = 0;
 

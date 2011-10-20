@@ -1630,4 +1630,10 @@ config SERIAL_ALTERA_UART_CONSOLE
 	help
 	  Enable a Altera UART port to be the system console.
 
+config WIMAX_SERIAL_MSM_HS
+	tristate "WiMAX UART console support"
+	depends on WIMAX && MMC
+	---help---
+	  Enable a WiMAX UART port to be the SQN1210 debug console.
+
 endmenu
