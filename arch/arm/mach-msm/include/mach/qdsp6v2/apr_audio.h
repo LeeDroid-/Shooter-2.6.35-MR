@@ -43,9 +43,14 @@ enum {
 	RSVD_2 = 9,
 	RSVD_3 = 10,
 	DIGI_MIC_TX = 11,
-	AFE_MAX_PORTS ,
+/*	AFE_MAX_PORTS , */
 	INVALID = 0xFFFF,
 };
+
+#define VOICE_RECORD_RX 0x8003          /* index = 12 */
+#define VOICE_RECORD_TX 0x8004          /* index = 13 */
+#define VOICE_PLAYBACK_TX 0x8005        /* index = 14 */
+
 
 #define AFE_PORT_CMD_START 0x000100ca
 struct afe_port_start_command {
@@ -245,7 +250,6 @@ struct afe_get_active_ports_rsp {
 	u16	num_ports;
 	u16	port_id;
 } __attribute__ ((packed));
-
 
 #define AFE_EVENT_GET_ACTIVE_HANDLES 0x00010102
 struct afe_get_active_handles_rsp {

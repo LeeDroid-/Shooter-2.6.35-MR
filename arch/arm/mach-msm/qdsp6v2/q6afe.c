@@ -22,6 +22,7 @@
 #include <linux/wait.h>
 #include <linux/jiffies.h>
 #include <mach/qdsp6v2/apr_audio.h>
+#include <mach/qdsp6v2/q6afe.h>
 
 struct afe_ctl {
 	void *apr;
@@ -32,6 +33,8 @@ struct afe_ctl {
 static struct afe_ctl this_afe;
 
 #define TIMEOUT_MS 1000
+#define Q6AFE_MAX_VOLUME 0x3FFF
+
 
 static int32_t afe_callback(struct apr_client_data *data, void *priv)
 {
@@ -47,6 +50,9 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			case AFE_PORT_CMD_START:
 			case AFE_PORT_CMD_LOOPBACK:
 			case AFE_PORT_CMD_SIDETONE_CTL:
+        //                case AFE_PORT_CMD_SET_PARAM:
+			case AFE_PSEUDOPORT_CMD_START:
+			case AFE_PSEUDOPORT_CMD_STOP:
 				atomic_set(&this_afe.state, 0);
 				wake_up(&this_afe.wait);
 				break;
@@ -58,6 +64,60 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		}
 	}
 	return 0;
+}
+
+int afe_validate_port(u16 port_id)
+{
+        int ret;
+
+        switch (port_id) {
+        case PRIMARY_I2S_RX:
+        case PRIMARY_I2S_TX:
+        case PCM_RX:
+        case PCM_TX:
+        case SECONDARY_I2S_RX:
+        case SECONDARY_I2S_TX:
+        case MI2S_RX:
+        case MI2S_TX:
+        case HDMI_RX:
+        case RSVD_2:
+        case RSVD_3:
+        case DIGI_MIC_TX:
+        case VOICE_RECORD_RX:
+        case VOICE_RECORD_TX:
+        case VOICE_PLAYBACK_TX:
+        {
+                ret = 0;
+                break;
+        }
+
+        default:
+                ret = -EINVAL;
+        }
+
+        return ret;
+}
+
+int afe_get_port_index(u16 port_id)
+{
+        switch (port_id) {
+        case PRIMARY_I2S_RX: return IDX_PRIMARY_I2S_RX;
+        case PRIMARY_I2S_TX: return IDX_PRIMARY_I2S_TX;
+        case PCM_RX: return IDX_PCM_RX;
+        case PCM_TX: return IDX_PCM_TX;
+        case SECONDARY_I2S_RX: return IDX_SECONDARY_I2S_RX;
+        case SECONDARY_I2S_TX: return IDX_SECONDARY_I2S_TX;
+        case MI2S_RX: return IDX_MI2S_RX;
+        case MI2S_TX: return IDX_MI2S_TX;
+        case HDMI_RX: return IDX_HDMI_RX;
+        case RSVD_2: return IDX_RSVD_2;
+        case RSVD_3: return IDX_RSVD_3;
+        case DIGI_MIC_TX: return IDX_DIGI_MIC_TX;
+        case VOICE_RECORD_RX: return IDX_VOICE_RECORD_RX;
+        case VOICE_RECORD_TX: return IDX_VOICE_RECORD_TX;
+        case VOICE_PLAYBACK_TX: return IDX_VOICE_PLAYBACK_TX;
+        default: return -EINVAL;
+        }
 }
 
 int afe_open(u16 port_id, union afe_port_config *afe_config, int rate)
@@ -93,7 +153,7 @@ int afe_open(u16 port_id, union afe_port_config *afe_config, int rate)
 	config.hdr.token = 0;
 	config.hdr.opcode = AFE_PORT_AUDIO_IF_CONFIG;
 
-	if (port_id >= AFE_MAX_PORTS) {
+	if (afe_validate_port(port_id) < 0) {
 
 		pr_aud_err("%s: Failed : Invalid Port id = %d\n", __func__,
 				port_id);
@@ -194,6 +254,98 @@ done:
 	return ret;
 }
 
+int afe_start_pseudo_port(u16 port_id)
+{
+        int ret = 0;
+        struct afe_pseudoport_start_command start;
+
+        pr_info("%s: port_id=%d\n", __func__, port_id);
+
+        if (this_afe.apr == NULL) {
+                this_afe.apr = apr_register("ADSP", "AFE", afe_callback,
+                                        0xFFFFFFFF, &this_afe);
+                pr_info("%s: Register AFE\n", __func__);
+                if (this_afe.apr == NULL) {
+                        pr_err("%s: Unable to register AFE\n", __func__);
+                        ret = -ENODEV;
+                        return ret;
+                }
+        }
+
+        start.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+                                APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+        start.hdr.pkt_size = sizeof(start);
+        start.hdr.src_port = 0;
+        start.hdr.dest_port = 0;
+        start.hdr.token = 0;
+        start.hdr.opcode = AFE_PSEUDOPORT_CMD_START;
+        start.port_id = port_id;
+        start.timing = 1;
+
+        atomic_set(&this_afe.state, 1);
+        ret = apr_send_pkt(this_afe.apr, (uint32_t *) &start);
+        if (ret < 0) {
+                pr_err("%s: AFE enable for port %d failed %d\n",
+                       __func__, port_id, ret);
+                ret = -EINVAL;
+                return ret;
+        }
+
+        ret = wait_event_timeout(this_afe.wait,
+                                 (atomic_read(&this_afe.state) == 0),
+                                 msecs_to_jiffies(TIMEOUT_MS));
+        if (!ret) {
+                pr_err("%s: wait_event timeout\n", __func__);
+                ret = -EINVAL;
+                return ret;
+        }
+
+        return 0;
+}
+
+int afe_stop_pseudo_port(u16 port_id)
+{
+        int ret = 0;
+        struct afe_pseudoport_stop_command stop;
+
+        pr_info("%s: port_id=%d\n", __func__, port_id);
+
+        if (this_afe.apr == NULL) {
+                pr_err("%s: AFE is already closed\n", __func__);
+                ret = -EINVAL;
+                return ret;
+        }
+
+        stop.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+                                APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+        stop.hdr.pkt_size = sizeof(stop);
+        stop.hdr.src_port = 0;
+        stop.hdr.dest_port = 0;
+        stop.hdr.token = 0;
+        stop.hdr.opcode = AFE_PSEUDOPORT_CMD_STOP;
+        stop.port_id = port_id;
+        stop.reserved = 0;
+
+        atomic_set(&this_afe.state, 1);
+        ret = apr_send_pkt(this_afe.apr, (uint32_t *) &stop);
+        if (ret < 0) {
+                pr_err("%s: AFE close failed %d\n", __func__, ret);
+                ret = -EINVAL;
+                return ret;
+        }
+
+        ret = wait_event_timeout(this_afe.wait,
+                                 (atomic_read(&this_afe.state) == 0),
+                                 msecs_to_jiffies(TIMEOUT_MS));
+        if (!ret) {
+                pr_err("%s: wait_event timeout\n", __func__);
+                ret = -EINVAL;
+                return ret;
+        }
+
+        return 0;
+}
+
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_afelb;
 
@@ -259,9 +411,9 @@ static ssize_t afe_debug_write(struct file *filp,
 				rc = -EINVAL;
 				goto afe_error;
 			}
-			if ((param[1] >= AFE_MAX_PORTS) || (param[2] >=
-				AFE_MAX_PORTS)) {
-				pr_aud_err("%s: Error, invalid afe port\n",
+                        if ((afe_validate_port(param[1]) < 0) ||
+                            (afe_validate_port(param[2])) < 0) {
+                                pr_err("%s: Error, invalid afe port\n",
 					__func__);
 			}
 			if (this_afe.apr == NULL) {

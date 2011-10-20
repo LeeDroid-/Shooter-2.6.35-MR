@@ -540,3 +540,4 @@ obj-$(CONFIG_MSM8X60_SSBI) += ssbi_8x60.o
 else
 obj-$(CONFIG_MSM_SSBI) += ssbi.o
 endif
+
