@@ -27,6 +27,14 @@
  */
 #ifndef __Q6_ADM_H__
 #define __Q6_ADM_H__
+#include <mach/qdsp6v2/q6afe.h>
+
+/* multiple copp per stream. */
+struct route_payload {
+        unsigned int copp_ids[AFE_MAX_PORTS];
+        unsigned short num_copps;
+        unsigned int session_id;
+};
 
 int adm_open(int port, int path, int rate, int mode, int topology);
 
@@ -38,6 +46,7 @@ int adm_memory_unmap_regions(uint32_t *buf_add, uint32_t *bufsz,
 
 int adm_close(int port);
 
-int adm_matrix_map(int session_id, int path, int num_copps, int *port_id);
+int adm_matrix_map(int session_id, int path, int num_copps, 
+				unsigned int *port_id, int copp_id);
 
 #endif /* __Q6_ADM_H__ */

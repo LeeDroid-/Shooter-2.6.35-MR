@@ -37,10 +37,18 @@
 #include <linux/slab.h>
 #include <mach/board.h>
 
+#if 0
 #define DPS(x...) printk(KERN_DEBUG "[PS][ISL29028] " x)
 #define DLS(x...) printk(KERN_DEBUG "[LS][ISL29028] " x)
 #define IPS(x...) printk(KERN_INFO "[PS][ISL29028] " x)
 #define ILS(x...) printk(KERN_INFO "[LS][ISL29028] " x)
+#else
+#define DPS(x...)
+#define DLS(x...)
+#define IPS(x...)
+#define ILS(x...)
+#endif
+
 #define EPS(x...) printk(KERN_ERR "[PS][ISL29028 ERROR] " x)
 #define ELS(x...) printk(KERN_ERR "[LS][ISL29028 ERROR] " x)
 
@@ -1612,7 +1620,6 @@ static ssize_t ps_test_mode_store(struct device *dev,
 {
 	char buffer[2] = "";
 	int test1 = 0, test2 = 0;
-	int value = 0;
 	int ret;
 
 	sscanf(buf, "0x%02x 0x%02x", &test1, &test2);

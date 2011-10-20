@@ -27,15 +27,20 @@
 #include <linux/msm_audio_amrnb.h>
 #include <asm/atomic.h>
 #include <asm/ioctls.h>
+#include <mach/qdsp6v2/audio_dev_ctl.h>
 #include <mach/qdsp6v2/apr_audio.h>
 #include <mach/qdsp6v2/q6asm.h>
 #include "audio_utils.h"
+
+#define VOC_REC_NONE 0xFF
 
 /* Buffer with meta*/
 #define PCM_BUF_SIZE		(4096 + sizeof(struct meta_in))
 
 /* Maximum 10 frames in buffer with meta */
 #define FRAME_SIZE		(1 + ((32+sizeof(struct meta_out_dsp)) * 10))
+
+static uint32_t rec_mode;
 
 void q6asm_amrnb_in_cb(uint32_t opcode, uint32_t token,
 		uint32_t *payload, void *priv)
@@ -140,10 +145,16 @@ static long amrnb_in_ioctl(struct file *file,
 		rc = 0;
 		pr_debug("%s:session id %d: AUDIO_START success enable[%d]\n",
 				__func__, audio->ac->session, audio->enabled);
+
+		if (rec_mode != VOC_REC_NONE)
+			msm_enable_incall_recording(audio->ac->session,
+				rec_mode, audio->pcm_cfg.sample_rate, audio->pcm_cfg.channel_count);
+
 		break;
 	}
 	case AUDIO_STOP: {
 		pr_debug("%s:AUDIO_STOP\n", __func__);
+		if (rec_mode != VOC_REC_NONE) msm_disable_incall_recording(audio->ac->session, rec_mode);
 		rc = audio_in_disable(audio);
 		if (rc  < 0) {
 			pr_aud_err("%s:session id %d: Audio Stop procedure failed\
@@ -186,6 +197,29 @@ static long amrnb_in_ioctl(struct file *file,
 				enc_cfg->band_mode, enc_cfg->dtx_enable);
 		break;
 	}
+        case AUDIO_SET_INCALL: {
+                if (copy_from_user(&rec_mode,
+                                   (void *) arg,
+                                   sizeof(rec_mode))) {
+                        rc = -EFAULT;
+                        pr_err("%s: Error copying in-call mode\n", __func__);
+                        break;
+                }
+
+                if (rec_mode != VOC_REC_UPLINK && rec_mode != VOC_REC_DOWNLINK &&
+                    rec_mode != VOC_REC_BOTH) {
+                        rc = -EINVAL;
+                        rec_mode = VOC_REC_NONE;
+
+                        pr_err("%s: Invalid %d in-call rec_mode\n",
+                               __func__, rec_mode);
+                        break;
+                }
+
+                pr_debug("%s: In-call rec_mode %d\n", __func__, rec_mode);
+                break;
+        }
+
 	default:
 		rc = -EINVAL;
 	}

@@ -38,6 +38,10 @@
 
 #define VOC_REC_NONE 0xFF
 
+#define AUDIO_GET_VOICE_STATE   _IOR(AUDIO_IOCTL_MAGIC, 55, unsigned)
+#define AUDIO_GET_DEV_DRV_VER	_IOR(AUDIO_IOCTL_MAGIC, 56, unsigned)
+#define DEV_DRV_VER		(8260 << 16 | 1)
+
 struct pcm {
 	struct mutex lock;
 	struct mutex read_lock;
@@ -149,6 +153,18 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		struct msm_audio_stats stats;
 		memset(&stats, 0, sizeof(stats));
 		if (copy_to_user((void *) arg, &stats, sizeof(stats)))
+			rc = -EFAULT;
+		break;
+	}
+	case AUDIO_GET_VOICE_STATE: {
+		int state = 1; // msm_get_voice_state();
+		if (copy_to_user((void *) arg, &state, sizeof(state)))
+			rc = -EFAULT;
+		break;
+	}
+	case AUDIO_GET_DEV_DRV_VER: {
+		unsigned int vers = DEV_DRV_VER;
+		if (copy_to_user((void *) arg, &vers, sizeof(vers)))
 			rc = -EFAULT;
 		break;
 	}
@@ -372,6 +388,7 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 	uint32_t size = 0;
 	uint32_t idx;
 	int rc = 0;
+        int len = 0;
 
 	if (!atomic_read(&pcm->in_enabled))
 		return -EFAULT;
@@ -381,7 +398,7 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 				(atomic_read(&pcm->in_count) ||
 				atomic_read(&pcm->in_stopped)), 5 * HZ);
 		if (!rc) {
-			pr_aud_err("%s: wait_event_timeout failed\n", __func__);
+                        pr_err("%s: wait_event_timeout failed\n", __func__);
 			goto fail;
 		}
 
@@ -392,32 +409,38 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 		}
 
 		data = q6asm_is_cpu_buf_avail(OUT, pcm->ac, &size, &idx);
-		if ((count >= size) && data) {
+                if (count >= size)
+                        len = size;
+                else {
+                        len = count;
+                        pr_err("%s: short read data[%p]bytesavail[%d]"
+                                "bytesrequest[%d]"
+                                "bytesrejected%d]\n",\
+                                __func__, data, size,
+                                count, (size - count));
+                }
+                if ((len) && data) {
 			offset = pcm->in_frame_info[idx][1];
-			if (copy_to_user(buf, data+offset, size)) {
-				pr_aud_err("%s copy_to_user failed\n", __func__);
+                        if (copy_to_user(buf, data+offset, len)) {
+                                pr_err("%s copy_to_user failed len[%d]\n",
+                                                        __func__, len);
 				rc = -EFAULT;
 				goto fail;
 			}
-
-			count -= size;
-			buf += size;
+                        count -= len;
+                        buf += len;
+                }
 			atomic_dec(&pcm->in_count);
 			memset(&pcm->in_frame_info[idx], 0,
 						sizeof(uint32_t) * 2);
 
 			rc = q6asm_read(pcm->ac);
 			if (rc < 0) {
-				pr_aud_err("%s q6asm_read faile\n", __func__);
+                        pr_err("%s q6asm_read fail\n", __func__);
 				goto fail;
 			}
 			rmb();
 			break;
-		} else {
-			pr_aud_err("%s: short read data[%p] size[%d]\n",\
-						__func__, data, size);
-			break;
-		}
 	}
 	rc = buf-start;
 fail:

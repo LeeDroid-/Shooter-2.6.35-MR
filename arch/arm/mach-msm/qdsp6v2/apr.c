@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/sysfs.h>
 #include <linux/device.h>
+#include <linux/slab.h>
 #include <mach/peripheral-loader.h>
 #include <mach/msm_smd.h>
 #include <mach/qdsp6v2/apr.h>
@@ -40,6 +41,14 @@
 
 struct apr_q6 q6;
 struct apr_client client[APR_DEST_MAX][APR_CLIENT_MAX];
+
+static struct workqueue_struct *apr_reset_workqueue;
+static void apr_reset_deregister(struct work_struct *work);
+struct apr_reset_work {
+        void *handle;
+        struct work_struct work;
+};
+
 
 inline int apr_fill_hdr(void *handle, uint32_t *buf, uint16_t src_port,
 			uint16_t msg_type, uint16_t dest_port,
@@ -415,6 +424,20 @@ done:
 	return svc;
 }
 
+static void apr_reset_deregister(struct work_struct *work)
+{
+        struct apr_svc *handle = NULL;
+        struct apr_reset_work *apr_reset =
+                        container_of(work, struct apr_reset_work, work);
+
+        handle = apr_reset->handle;
+        pr_debug("%s:handle[%p]\n", __func__, handle);
+        apr_deregister(handle);
+        kfree(apr_reset);
+        msleep(5);
+}
+
+
 int apr_deregister(void *handle)
 {
 	struct apr_svc *svc = handle;
@@ -455,6 +478,25 @@ int apr_deregister(void *handle)
 	mutex_unlock(&svc->m_lock);
 
 	return 0;
+}
+
+void apr_reset(void *handle)
+{
+        struct apr_reset_work *apr_reset_worker = NULL;
+
+        if (!handle)
+                return;
+        pr_debug("%s: handle[%p]\n", __func__, handle);
+
+        apr_reset_worker = kzalloc(sizeof(struct apr_reset_work),
+                                        GFP_ATOMIC);
+        if (apr_reset_worker == NULL || apr_reset_workqueue == NULL) {
+                pr_err("%s: mem failure\n", __func__);
+                return;
+        }
+        apr_reset_worker->handle = handle;
+        INIT_WORK(&apr_reset_worker->work, apr_reset_deregister);
+        queue_work(apr_reset_workqueue, &apr_reset_worker->work);
 }
 
 void change_q6_state(int state)
@@ -531,6 +573,11 @@ static int __init apr_init(void)
 		}
 	mutex_init(&q6.lock);
 	dsp_debug_register(adsp_state);
+        apr_reset_workqueue =
+                create_singlethread_workqueue("apr_driver");
+        if (!apr_reset_workqueue)
+                return -ENOMEM;
+
 	return 0;
 }
 device_initcall(apr_init);

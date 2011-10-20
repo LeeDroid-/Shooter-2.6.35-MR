@@ -110,6 +110,16 @@ enum {
 #define VSS_ICOMMON_CMD_SET_VOICE_TIMING		0x000111E0
 /* Set the voice timing parameters. */
 
+struct vss_imvm_cmd_create_full_control_session_t {
+        char name[20];
+        /*
+         * A variable-sized stream name.
+         *
+         * The stream name size is the payload size minus the size of the other
+         * fields.
+         */
+} __packed;
+
 struct vss_istream_cmd_set_tty_mode_t {
 	uint32_t mode;
 	/**<
@@ -188,6 +198,11 @@ struct mvm_create_passive_ctl_session_cmd {
 	struct apr_hdr hdr;
 } __attribute__((packed));
 
+struct mvm_create_full_ctl_session_cmd {
+        struct apr_hdr hdr;
+        struct vss_imvm_cmd_create_full_control_session_t mvm_session;
+} __packed;
+
 struct mvm_set_tty_mode_cmd {
 	struct apr_hdr hdr;
 	struct vss_istream_cmd_set_tty_mode_t tty_mode;
@@ -257,6 +272,12 @@ struct mvm_set_voice_timing_cmd {
 
 #define VSS_ISTREAM_CMD_START_RECORD                   0x00011236
 #define VSS_ISTREAM_CMD_STOP_RECORD                    0x00011237
+
+#define VSS_ISTREAM_CMD_START_PLAYBACK                  0x00011238
+/* Start in-call music delivery on the Tx voice path. */
+
+#define VSS_ISTREAM_CMD_STOP_PLAYBACK                   0x00011239
+/* Stop the in-call music delivery on the Tx voice path. */
 
 
 struct vss_istream_cmd_create_passive_control_session_t {
@@ -647,5 +668,6 @@ void voice_config_vocoder(uint32_t media_type,
 
 int voice_start_record(uint32_t rec_mode, uint32_t set);
 
-#endif
+int voice_start_playback(uint32_t set);
 
+#endif

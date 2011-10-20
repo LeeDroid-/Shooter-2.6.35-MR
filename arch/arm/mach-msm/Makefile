@@ -61,9 +61,9 @@ ifdef CONFIG_ARCH_MSM8X60
 quiet_cmd_mkrpcsym = MKCAP   $@
 	cmd_mkrpcsym = $(PERL) $(srctree)/$(src)/mkrpcsym.pl $< $@
 
-target += smd_rpc_sym.c
-$(obj)/smd_rpc_sym.c: $(src)/smd_rpc_sym $(src)/mkrpcsym.pl
-	$(call if_changed,mkrpcsym)
+#target += smd_rpc_sym.c
+#$(obj)/smd_rpc_sym.c: $(src)/smd_rpc_sym $(src)/mkrpcsym.pl
+#	$(call if_changed,mkrpcsym)
 
 ifeq ($(CONFIG_ARCH_MSM8X60_LTE),y)
 obj-$(CONFIG_ARCH_MSM8X60_LTE) += 8x60-lte/
@@ -540,4 +540,3 @@ obj-$(CONFIG_MSM8X60_SSBI) += ssbi_8x60.o
 else
 obj-$(CONFIG_MSM_SSBI) += ssbi.o
 endif
-
