@@ -2585,6 +2585,13 @@ void __init msm_clk_soc_init(void)
 	local_clk_set_rate(C(USB_HS1_XCVR), 60000000);
 	local_clk_set_rate(C(USB_FS1_SRC), 60000000);
 	local_clk_set_rate(C(USB_FS2_SRC), 60000000);
+
+	/* The halt status bits for PDM and TSSC may be incorrect at boot.
+	 * Toggle these clocks on and off to refresh them. */
+	local_clk_enable(C(PDM));
+	local_clk_disable(C(PDM));
+	local_clk_enable(C(TSSC));
+	local_clk_disable(C(TSSC));
 }
 
 void msm_clk_soc_set_ignore_list(int *ignore_clk, unsigned num_ignore_clk)
