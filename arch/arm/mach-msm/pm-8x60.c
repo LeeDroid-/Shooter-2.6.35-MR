@@ -222,7 +222,7 @@ static int __init msm_pm_mode_sysfs_add_cpu(
 {
 	char cpu_name[8];
 	struct kobject *cpu_kobj;
-	struct msm_pm_sysfs_sleep_mode *mode;
+	struct msm_pm_sysfs_sleep_mode *mode = NULL;
 	int i, k;
 	int ret;
 
@@ -279,6 +279,12 @@ static int __init msm_pm_mode_sysfs_add_cpu(
 	ret = 0;
 
 mode_sysfs_add_cpu_exit:
+	if (!ret) {
+		if (mode && mode->kobj)
+			kobject_del(mode->kobj);
+		kfree(mode);
+	}
+
 	return ret;
 }
 
