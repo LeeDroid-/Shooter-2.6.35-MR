@@ -3662,13 +3662,13 @@ static unsigned int msm_timpani_setup_power(void)
 		return -ENODEV;
 	}
 
-	rc = regulator_set_voltage(vreg_timpani_1, 1200000, 1200000);
+	rc = regulator_set_voltage(vreg_timpani_1, 1100000, 1100000);
 	if (rc) {
 		pr_err("%s: unable to set L0 voltage to 1.2V\n", __func__);
 		goto fail;
 	}
 
-	rc = regulator_set_voltage(vreg_timpani_2, 1800000, 1800000);
+	rc = regulator_set_voltage(vreg_timpani_2, 1700000, 1700000);
 	if (rc) {
 		pr_err("%s: unable to set S3 voltage to 1.8V\n", __func__);
 		goto fail;
@@ -3736,7 +3736,7 @@ static int msm_timpani_codec_power(int vreg_on)
 	if (vreg_on) {
 
 		rc = regulator_set_voltage(vreg_timpani_cdc_apwr,
-				2200000, 2200000);
+				2000000, 2000000);
 		if (rc) {
 			pr_err("%s: unable to set 8058_s4 voltage to 2.2 V\n",
 					__func__);
@@ -5153,7 +5153,7 @@ static void __init msm8x60_init_mmc(void)
 	sdcc_vreg_data[0].vdd_data = &sdcc_vdd_reg_data[0];
 	sdcc_vreg_data[0].vdd_data->reg_name = "8901_l5";
 	sdcc_vreg_data[0].vdd_data->set_voltage_sup = 1;
-	sdcc_vreg_data[0].vdd_data->level = 2850000;
+	sdcc_vreg_data[0].vdd_data->level = 2800000;
 	sdcc_vreg_data[0].vccq_data = &sdcc_vccq_reg_data[0];
 	sdcc_vreg_data[0].vccq_data->reg_name = "8901_lvs0";
 	sdcc_vreg_data[0].vccq_data->set_voltage_sup = 0;
