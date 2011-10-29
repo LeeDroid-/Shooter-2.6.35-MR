@@ -693,6 +693,8 @@ static void do_dbs_timer(struct work_struct *work)
 	} else {
 		__cpufreq_driver_target(dbs_info->cur_policy,
 			dbs_info->freq_lo, CPUFREQ_RELATION_H);
+		if (dbs_info->sample_type == DBS_SUB_SAMPLE)
+			delay = dbs_info->freq_lo_jiffies;
 	}
 	queue_delayed_work_on(cpu, kondemand_wq, &dbs_info->work, delay);
 	mutex_unlock(&dbs_info->timer_mutex);
