@@ -126,6 +126,14 @@ static void cpu_hotplug_done(void)
 	enable_hlt();
 }
 
+bool cpu_hotplug_inprogress(void)
+{
+	if (cpu_hotplug.active_writer)
+		return true;
+
+	return false;
+}
+
 #else /* #if CONFIG_HOTPLUG_CPU */
 static void cpu_hotplug_begin(void) {}
 static void cpu_hotplug_done(void) {}
