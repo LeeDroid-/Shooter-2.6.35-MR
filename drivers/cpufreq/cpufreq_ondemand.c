@@ -749,20 +749,28 @@ static void dbs_refresh_callback(struct work_struct *unused)
 {
 	struct cpufreq_policy *policy;
 	struct cpu_dbs_info_s *this_dbs_info;
+	unsigned int cpu = smp_processor_id();
 
-	if (trylock_policy_rwsem_write(0) < 0)
+	if (trylock_policy_rwsem_write(cpu) < 0)
 		return;
 
-	this_dbs_info = &per_cpu(od_cpu_dbs_info, 0);
+	this_dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
 	policy = this_dbs_info->cur_policy;
+	if (!policy) {
+		/* CPU not using ondemand governor */
+		unlock_policy_rwsem_write(cpu);
+		return;
+	}
 
 	if (policy->cur < policy->max) {
+		policy->cur = policy->max;
+
 		__cpufreq_driver_target(policy, policy->max,
 					CPUFREQ_RELATION_L);
-		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(0,
+		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
 				&this_dbs_info->prev_cpu_wall);
 	}
-	unlock_policy_rwsem_write(0);
+	unlock_policy_rwsem_write(cpu);
 }
 
 static DECLARE_WORK(dbs_refresh_work, dbs_refresh_callback);
