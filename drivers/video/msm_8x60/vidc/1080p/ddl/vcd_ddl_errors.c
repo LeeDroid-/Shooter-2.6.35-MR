@@ -244,6 +244,7 @@ static u32 ddl_handle_core_recoverable_errors(
 				vcd_status = VCD_ERR_BITSTREAM_ERR;
 				DDL_MSG_ERROR("VIDC_BIT_STREAM_ERR");
 				break;
+			case VIDC_1080P_ERROR_B_FRAME_NOT_SUPPORTED:
 			case VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE:
 			case VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED:
 				if (ddl->decoding) {
