@@ -32,6 +32,7 @@
 #include <linux/rmt_storage_client-8x60.h>
 #include <linux/debugfs.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <mach/msm_rpcrouter.h>
@@ -1246,6 +1247,7 @@ static int rmt_storage_reg_cb(struct msm_rpc_client *client,
 {
 	struct rmt_storage_reg_cb_args args;
 	int rc, cb_id;
+	int retries = 10;
 
 	cb_id = msm_rpc_add_cb_func(client, callback);
 	if ((cb_id < 0) && (cb_id != MSM_RPC_CLIENT_NULL_CB_ID))
@@ -1254,8 +1256,14 @@ static int rmt_storage_reg_cb(struct msm_rpc_client *client,
 	args.event = event;
 	args.cb_id = cb_id;
 
-	rc = msm_rpc_client_req2(client, proc, rmt_storage_arg_cb,
-			&args, NULL, NULL, -1);
+	while (retries) {
+		rc = msm_rpc_client_req2(client, proc, rmt_storage_arg_cb,
+					 &args, NULL, NULL, -1);
+		if (rc != -ETIMEDOUT)
+			break;
+		retries--;
+		udelay(1000);
+	}
 	if (rc)
 		pr_err("%s: Failed to register callback for event %d\n",
 				__func__, event);
