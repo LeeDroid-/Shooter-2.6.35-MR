@@ -30,6 +30,7 @@
 
 #include <mach/msm_smd.h>
 #include <mach/peripheral-loader.h>
+#include <mach/socinfo.h>
 
 #include "smd_private.h"
 
@@ -361,6 +362,7 @@ static struct tty_driver *smd_tty_driver;
 static int __init smd_tty_init(void)
 {
 	int ret;
+	int ds_registered = 0;
 
 	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
 	if (smd_tty_driver == 0)
@@ -417,9 +419,19 @@ static int __init smd_tty_init(void)
 	smd_tty[0].driver.probe = smd_tty_dummy_probe;
 	smd_tty[0].driver.driver.name = smd_ch_name[0];
 	smd_tty[0].driver.driver.owner = THIS_MODULE;
-	ret = platform_driver_register(&smd_tty[0].driver);
-	if (ret)
-		goto out;
+
+	/*
+	 * DS port is opened in the kernel starting with 8660 fusion.
+	 * Only register the platform driver for targets older than that.
+	 */
+	if (cpu_is_msm7x01() || cpu_is_msm7x25() || cpu_is_msm7x27() ||
+			cpu_is_msm7x30() || cpu_is_qsd8x50() ||
+			cpu_is_msm8x55() ||  (cpu_is_msm8x60())) {
+		ret = platform_driver_register(&smd_tty[0].driver);
+		if (ret)
+			goto out;
+		ds_registered = 1;
+	}
 	smd_tty[7].driver.probe = smd_tty_dummy_probe;
 	smd_tty[7].driver.driver.name = smd_ch_name[7];
 	smd_tty[7].driver.driver.owner = THIS_MODULE;
@@ -485,7 +497,8 @@ unreg9:
 unreg7:
 	platform_driver_unregister(&smd_tty[7].driver);
 unreg0:
-	platform_driver_unregister(&smd_tty[0].driver);
+	if (ds_registered)
+		platform_driver_unregister(&smd_tty[0].driver);
 out:
 	tty_unregister_device(smd_tty_driver, 0);
 	tty_unregister_device(smd_tty_driver, 7);
