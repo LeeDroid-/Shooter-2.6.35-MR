@@ -27,7 +27,7 @@
 #include "rpm.h"
 
 #define NMASTERS 39
-#define NSLAVES 67
+#define NSLAVES 68
 
 enum msm_bus_fabric_tiered_slave_type {
 	MSM_BUS_SYSTEM_TIERED_SLAVE_FAB_APPSS = 1,
