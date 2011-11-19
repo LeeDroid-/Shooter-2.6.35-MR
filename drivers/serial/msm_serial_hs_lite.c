@@ -41,6 +41,7 @@
 #include <linux/gpio.h>
 #include <mach/board.h>
 #include <mach/msm_serial_hs_lite.h>
+#include <mach/msm_watchdog.h>
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
 
@@ -1009,7 +1010,7 @@ static void msm_hsl_console_write(struct console *co, const char *s,
 		}
 	}
 	msm_hsl_console_putchars(port, num, last_break);
-
+	ratelimited_pet_watchdog();
 	if (locked == 1)
 		spin_unlock(&port->lock);
 }
