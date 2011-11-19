@@ -14,5 +14,6 @@
 #define __ARCH_ARM_MACH_MSM_MSM_WATCHDOG_H
 
 void pet_watchdog(void);
+void ratelimited_pet_watchdog(void);
 
 #endif

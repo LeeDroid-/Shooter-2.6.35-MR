@@ -39,6 +39,9 @@
 #if defined(CONFIG_MSM_RMT_STORAGE_CLIENT)
 #include <linux/rmt_storage_client-8x60.h>
 #endif
+#include <mach/irqs.h>
+#include <mach/scm.h>
+#include <mach/msm_watchdog.h>
 
 #define TCSR_WDT_CFG 0x30
 
