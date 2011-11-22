@@ -46,9 +46,20 @@ struct ashmem_pin {
 #define ASHMEM_PURGE_ALL_CACHES	_IO(__ASHMEMIOC, 10)
 #define ASHMEM_CACHE_FLUSH_RANGE	_IO(__ASHMEMIOC, 11)
 #define ASHMEM_CACHE_CLEAN_RANGE	_IO(__ASHMEMIOC, 12)
+#define ASHMEM_CACHE_INV_RANGE   _IO(__ASHMEMIOC, 13)
 
 int get_ashmem_file(int fd, struct file **filp, struct file **vm_file,
 			unsigned long *len);
 void put_ashmem_file(struct file *file);
+
+static inline void __flush_axi_bus_buffer(void)
+{
+#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
+	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+					: : "r" (0) : "memory");
+	write_to_strongly_ordered_memory();
+#endif
+}
+
 
 #endif	/* _LINUX_ASHMEM_H */
