@@ -251,7 +251,7 @@ void __sync_icache_dcache(pte_t pteval)
 	else
 		mapping = NULL;
 
-	if (test_and_clear_bit(PG_dcache_clean, &page->flags))
+	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
 		__flush_dcache_page(mapping, page);
 	/* pte_exec() already checked above for non-aliasing VIPT cache */
 	if (cache_is_vipt_nonaliasing() || pte_exec(pteval))

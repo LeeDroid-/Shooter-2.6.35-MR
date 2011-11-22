@@ -30,6 +30,9 @@
 #define POWER_COLLAPSE_STATUS_MAGIC	0xACBDFE00
 #define MSM_POWER_COLLAPSE_STATUS_BASE	(0xFE822000 - 0x8)
 
+#define RESET_VECTOR_CLEAN_MAGIC	0xABCDDCBA
+#define MSM_RESET_VECTOR_BASE          (MSM_POWER_COLLAPSE_STATUS_BASE - 0x8)
+
 #define MSM_POWER_COLLAPSE_STATUS_BASE_PHYS	(0x40400000 - 0x8)
 /* r0 already has the cpu number */
 .macro set_power_collapse_status_phy, x
@@ -78,6 +81,14 @@ ENTRY(msm_pm_collapse)
 	str	r1, [r2]			/* store current cpu number for later use. */
 
 	stmia   r0!, {r4-r14}
+
+	/* Store reset factor for two cpu*/
+	ldr     r5, =cur_cpu
+	ldr     r5, [r5]                        /* get current cpu number */
+	ldr     r6, =msm_pm_boot_vector
+	ldr     r7, [r6, r5, LSL #2]            /* get the reset vector of cpu*/
+	ldr     r6, =MSM_RESET_VECTOR_BASE
+	str     r7, [r6, r5, LSL #2]            /* store it */
 
 	mrc     p15, 0, r1, c1, c0, 0 /* MMU control */
 	mrc     p15, 0, r2, c2, c0, 0 /* TTBR0 */
