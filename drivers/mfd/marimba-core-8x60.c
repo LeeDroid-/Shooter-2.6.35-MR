@@ -129,6 +129,7 @@ int marimba_write_bit_mask(struct marimba *marimba, u8 reg, u8 *value,
 	marimba = &marimba_modules[marimba->mod_id];
 
 	mutex_lock(&marimba->xfer_lock);
+	memset(mask_value, 0, sizeof(mask_value));
 
 	for (i = 0; i < num_bytes; i++)
 		mask_value[i] = (marimba_shadow[marimba->mod_id][reg + i]
@@ -153,7 +154,8 @@ int marimba_write_bit_mask(struct marimba *marimba, u8 reg, u8 *value,
 		for (i = 0; i < num_bytes; i++)
 			marimba_shadow[marimba->mod_id][reg + i]
 							= mask_value[i];
-	}
+	} else
+		dev_err(&marimba->client->dev, "i2c write failed\n");
 
 	mutex_unlock(&marimba->xfer_lock);
 
@@ -222,7 +224,8 @@ int marimba_read_bit_mask(struct marimba *marimba, u8 reg, u8 *value,
 			marimba_shadow[marimba->mod_id][reg + i] = value[i];
 			value[i] &= mask;
 		}
-	}
+	} else
+		dev_err(&marimba->client->dev, "i2c read failed\n");
 
 	mutex_unlock(&marimba->xfer_lock);
 
@@ -475,7 +478,7 @@ static int marimba_probe(struct i2c_client *client,
 			pdata->bahama_shutdown(cur_adie_type);
 		if (pdata->marimba_shutdown != NULL)
 			pdata->marimba_shutdown();
-		return 0;
+		return -ENODEV;
 	}
 
 	if (rc < 2) {
@@ -539,7 +542,7 @@ static int __devexit marimba_remove(struct i2c_client *client)
 	struct marimba_platform_data *pdata;
 
 	pdata = client->dev.platform_data;
-	for (i = 0; i <= ADIE_ARRY_SIZE; i++) {
+	for (i = 0; i < ADIE_ARRY_SIZE; i++) {
 		struct marimba *marimba = &marimba_modules[i];
 
 		if (marimba->client && marimba->client != client)
