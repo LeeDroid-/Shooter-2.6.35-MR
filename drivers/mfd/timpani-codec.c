@@ -1445,26 +1445,39 @@ static struct adie_codec_state adie_codec;
 
 static int adie_codec_write(u8 reg, u8 mask, u8 val)
 {
-	int rc;
-	int i = 0;
+        int rc;
+ 
+	rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg, &val, 1, mask);
 
-	for (i = 0; i < 5; i++) {
-
-		pr_debug("%s: write reg %x val %x\n", __func__, reg, val);
-
-		rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg,  &val, 1, mask);
-		if (IS_ERR_VALUE(rc))
-			pr_err("%s: fail to write reg %x\n", __func__, reg);
-		else
-			return 0;
+	if ((rc == -ETIMEDOUT) || (rc == -ENOTCONN)) {
+		pr_info("%s: Timpani write error, retrying\n",
+				__func__);
+		rc = marimba_write_bit_mask(adie_codec.pdrv_ptr,
+				reg, &val, 1, mask);
 	}
 
-	return -EIO;
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("%s: Timpani write error\n", __func__);
+		goto error;
+        }
+ 
+        pr_debug("%s: write reg %x val %x\n", __func__, reg, val);
+error:
+	return rc;
 }
 #ifdef CONFIG_DEBUG_FS
 static int adie_codec_read(u8 reg, u8 *val)
 {
-	return marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
+	int rc;
+	rc = marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
+	if ((rc == -ETIMEDOUT) || (rc == -ENOTCONN)) {
+		pr_info("%s: Timpani read error, retrying\n", __func__);
+		rc = marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
+	}
+	if (rc)
+		pr_err("%s: fail to read reg %x, (error %d)\n", __func__,
+				reg, rc);
+	return rc;
 }
 #endif
 static int timpani_adie_codec_setpath(struct adie_codec_path *path_ptr,
