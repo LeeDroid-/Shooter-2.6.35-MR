@@ -67,6 +67,9 @@ enum /* regaccess blk id */
 	RA_BLOCK_RESERVED,
 	RA_BLOCK_NUM,
 };
+#define TIMPANI_ARRAY_SIZE	(TIMPANI_A_CDC_COMP_HALT + 1)
+
+static u8 timpani_shadow[TIMPANI_ARRAY_SIZE];
 
 enum /* regaccess onwer ID */
 {
@@ -1443,25 +1446,87 @@ struct adie_codec_state {
 
 static struct adie_codec_state adie_codec;
 
+/* A cacheable register is one that if the register's current value is being
+ * written to it again, then it is permissable to skip that register write
+ * because it does not actually change the value of the hardware register.
+ *
+ * Some registers are uncacheable, meaning that even they are being written
+ * again with their current value, the write has another purpose and must go
+ * through.
+ *
+ * Knowing the codec's uncacheable registers allows the driver to avoid
+ * unnecessary codec register writes while making sure important register writes
+ * are not skipped.
+ */
+
+static bool timpani_register_is_cacheable(u8 reg)
+{
+	switch (reg) {
+	case TIMPANI_A_PA_LINE_L_GAIN:
+	case TIMPANI_A_PA_LINE_R_GAIN:
+	case TIMPANI_A_PA_HPH_L_GAIN:
+	case TIMPANI_A_PA_HPH_R_GAIN:
+	case TIMPANI_A_CDC_GCTL1:
+	case TIMPANI_A_CDC_ST_CTL:
+	case TIMPANI_A_CDC_GCTL2:
+	case TIMPANI_A_CDC_ARB_BYPASS_CTL:
+	case TIMPANI_A_CDC_CH_CTL:
+	case TIMPANI_A_CDC_ANC1_IIR_COEFF_PTR:
+	case TIMPANI_A_CDC_ANC1_IIR_COEFF_MSB:
+	case TIMPANI_A_CDC_ANC1_IIR_COEFF_LSB:
+	case TIMPANI_A_CDC_ANC1_LPF_COEFF_PTR:
+	case TIMPANI_A_CDC_ANC1_LPF_COEFF_MSB:
+	case TIMPANI_A_CDC_ANC1_LPF_COEFF_LSB:
+	case TIMPANI_A_CDC_ANC1_SCALE_PTR:
+	case TIMPANI_A_CDC_ANC1_SCALE:
+	case TIMPANI_A_CDC_ANC2_IIR_COEFF_PTR:
+	case TIMPANI_A_CDC_ANC2_IIR_COEFF_MSB:
+	case TIMPANI_A_CDC_ANC2_IIR_COEFF_LSB:
+	case TIMPANI_A_CDC_ANC2_LPF_COEFF_PTR:
+	case TIMPANI_A_CDC_ANC2_LPF_COEFF_MSB:
+	case TIMPANI_A_CDC_ANC2_LPF_COEFF_LSB:
+	case TIMPANI_A_CDC_ANC2_SCALE_PTR:
+	case TIMPANI_A_CDC_ANC2_SCALE:
+	case TIMPANI_A_CDC_ANC1_CTL1:
+	case TIMPANI_A_CDC_ANC1_CTL2:
+	case TIMPANI_A_CDC_ANC1_FF_FB_SHIFT:
+	case TIMPANI_A_CDC_ANC2_CTL1:
+	case TIMPANI_A_CDC_ANC2_CTL2:
+	case TIMPANI_A_CDC_ANC2_FF_FB_SHIFT:
+	case TIMPANI_A_AUXPGA_LR_GAIN:
+		return false;
+	default:
+		return true;
+	}
+}
+
 static int adie_codec_write(u8 reg, u8 mask, u8 val)
 {
-        int rc;
- 
-	rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg, &val, 1, mask);
+	int rc = 0;
+	u8 new_val;
 
-	if ((rc == -ETIMEDOUT) || (rc == -ENOTCONN)) {
-		pr_info("%s: Timpani write error, retrying\n",
+	new_val = (val & mask) | (timpani_shadow[reg] & ~mask);
+	if (!(timpani_register_is_cacheable(reg) &&
+	     (new_val == timpani_shadow[reg]))) {
+		rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg,  &new_val,
+			1, 0xFF);
+
+		if ((rc == -ETIMEDOUT) || (rc == -ENOTCONN)) {
+			pr_info("%s: Timpani write error, retrying\n",
 				__func__);
-		rc = marimba_write_bit_mask(adie_codec.pdrv_ptr,
-				reg, &val, 1, mask);
-	}
+			rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg,
+				&new_val, 1, 0xFF);
+		}
 
-	if (IS_ERR_VALUE(rc)) {
-		pr_err("%s: Timpani write error\n", __func__);
-		goto error;
-        }
- 
-        pr_debug("%s: write reg %x val %x\n", __func__, reg, val);
+		if (IS_ERR_VALUE(rc)) {
+			pr_err("%s: Timpani write error\n", __func__);
+			rc = -EIO;
+			goto error;
+		}
+		timpani_shadow[reg] = new_val;
+		pr_debug("%s: write reg %x val %x new value %x\n", __func__,
+			reg, val, new_val);
+	}
 error:
 	return rc;
 }
@@ -1663,7 +1728,7 @@ static void adie_codec_reach_stage_action(struct adie_codec_path *path_ptr,
 		return;
 
 
-	if (stage != ADIE_CODEC_FLASH_IMAGE)
+	if (stage != ADIE_CODEC_DIGITAL_OFF)
 		return;
 
 	for (iblk = 0 ; iblk <= RA_BLOCK_RESERVED ; iblk++) {
@@ -1795,7 +1860,7 @@ static int timpani_adie_codec_open(struct adie_codec_dev_profile *profile,
 	*path_pptr = (void *) &adie_codec.path[profile->path_type];
 	adie_codec.ref_cnt++;
 	adie_codec.path[profile->path_type].hwsetting_idx = 0;
-	adie_codec.path[profile->path_type].curr_stage = ADIE_CODEC_FLASH_IMAGE;
+	adie_codec.path[profile->path_type].curr_stage = ADIE_CODEC_DIGITAL_OFF;
 	adie_codec.path[profile->path_type].stage_idx = 0;
 
 
@@ -1872,6 +1937,18 @@ static const struct adie_codec_operations timpani_adie_ops = {
 	.codec_set_master_mode = timpani_adie_codec_set_master_mode,
 	.codec_enable_anc = timpani_adie_codec_enable_anc,
 };
+
+static void timpani_codec_populate_shadow_registers(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(timpani_regset); i++) {
+		if (timpani_regset[i].reg_addr < TIMPANI_ARRAY_SIZE) {
+			timpani_shadow[timpani_regset[i].reg_addr] =
+				timpani_regset[i].reg_default;
+		}
+	}
+}
 
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_timpani_dent;
@@ -2011,6 +2088,8 @@ static int timpani_codec_probe(struct platform_device *pdev)
 
 	if (adie_codec.codec_pdata->snddev_profile_init)
 		adie_codec.codec_pdata->snddev_profile_init();
+
+	timpani_codec_populate_shadow_registers();
 
 	/* Register the timpani ADIE operations */
 	rc = adie_codec_register_codec_operations(&timpani_adie_ops);
