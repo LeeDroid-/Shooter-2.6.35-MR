@@ -74,6 +74,7 @@ static int hs_pmic_remote_threshold(uint32_t adc)
 {
 	int i = 0;
 	int ret = 0;
+	int array_size = 0;
 	uint32_t status;
 	struct hs_pmic_rpc_request req;
 	struct hs_pmic_rpc_reply rep;
@@ -87,7 +88,10 @@ static int hs_pmic_remote_threshold(uint32_t adc)
 	req.hs_switch = cpu_to_be32(hi->pdata.hs_switch);
 	req.current_uA = cpu_to_be32(HS_PMIC_HTC_CURRENT_THRESHOLD);
 
-	for (i = 0; i < ARRAY_SIZE(current_threshold_lut); i++) {
+	array_size = sizeof(current_threshold_lut) /
+		     sizeof(struct hs_pmic_current_threshold);
+
+	for (i = 0; i < array_size; i++) {
 		if (adc >= current_threshold_lut[i].adc_min &&
 		    adc <= current_threshold_lut[i].adc_max)
 			req.current_uA = cpu_to_be32(current_threshold_lut[i].
@@ -128,7 +132,8 @@ static int hs_pmic_remote_adc(int *adc)
 				 &req, sizeof(req), &rep, sizeof(rep),
 				 HS_RPC_TIMEOUT);
 	if (ret < 0) {
-		HS_ERR("Failed to read remote ADC");
+		*adc = -1;
+		HS_LOG("Failed to read remote ADC");
 		return 0;
 	}
 
@@ -140,12 +145,13 @@ static int hs_pmic_remote_adc(int *adc)
 
 static int hs_pmic_mic_status(void)
 {
-	int ret = 0;
 	int adc = 0;
+	int mic = HEADSET_UNKNOWN_MIC;
 
 	HS_DBG();
 
-	ret = hs_pmic_remote_adc(&adc);
+	if (!hs_pmic_remote_adc(&adc))
+		return HEADSET_UNKNOWN_MIC;
 
 	if (hi->pdata.driver_flag & DRIVER_HS_PMIC_DYNAMIC_THRESHOLD)
 		hs_pmic_remote_threshold((unsigned int) adc);
@@ -153,13 +159,13 @@ static int hs_pmic_mic_status(void)
 
 	if (adc >= hi->pdata.adc_mic_bias[0] &&
 	    adc <= hi->pdata.adc_mic_bias[1])
-		ret = HEADSET_MIC;
+		mic = HEADSET_MIC;
 	else if (adc < hi->pdata.adc_mic_bias[0])
-		ret = HEADSET_NO_MIC;
+		mic = HEADSET_NO_MIC;
 	else
-		ret = HEADSET_UNKNOWN_MIC;
+		mic = HEADSET_UNKNOWN_MIC;
 
-	return ret;
+	return mic;
 }
 
 static int hs_pmic_adc_to_keycode(int adc)

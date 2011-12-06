@@ -473,6 +473,7 @@ int __init rmt_storage_add_ramfs(void);
 
 void msm_hsusb_set_vbus_state(int online);
 enum usb_connect_type {
+	CONNECT_TYPE_CLEAR = -2,
 	CONNECT_TYPE_UNKNOWN = -1,
 	CONNECT_TYPE_NONE = 0,
 	CONNECT_TYPE_USB,

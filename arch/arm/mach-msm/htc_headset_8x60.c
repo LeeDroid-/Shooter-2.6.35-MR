@@ -41,10 +41,15 @@ static int hs_8x60_remote_adc(int *adc)
 	ret = pm8058_htc_config_mpp_and_adc_read(adc, 1, CHANNEL_ADC_HDSET,
 						 hi->pdata.adc_mpp,
 						 hi->pdata.adc_amux);
-	if (ret)
-		HS_ERR("Failed to read remote ADC");
-	else
-		HS_LOG("Remote ADC %d (0x%X)", *adc, *adc);
+	if (ret) {
+#if 0 /* ADC function in suspend mode */
+		*adc = -1;
+#endif
+		HS_LOG("Failed to read remote ADC");
+		return 0;
+	}
+
+	HS_LOG("Remote ADC %d (0x%X)", *adc, *adc);
 
 	return 1;
 }
@@ -52,11 +57,12 @@ static int hs_8x60_remote_adc(int *adc)
 static int hs_8x60_mic_status(void)
 {
 	int adc = 0;
-	int mic = 0;
+	int mic = HEADSET_UNKNOWN_MIC;
 
 	HS_DBG();
 
-	hs_8x60_remote_adc(&adc);
+	if (!hs_8x60_remote_adc(&adc))
+		return HEADSET_UNKNOWN_MIC;
 
 /*
 	if (hi->pdata.driver_flag & DRIVER_HS_PMIC_DYNAMIC_THRESHOLD)
@@ -111,7 +117,9 @@ static void button_8x60_work_func(struct work_struct *work)
 
 	HS_DBG();
 
-	hs_8x60_remote_adc(&adc);
+	if (!hs_8x60_remote_adc(&adc))
+		return;
+
 	key_code = hs_8x60_adc_to_keycode(adc);
 
 	if (key_code != HS_MGR_KEY_INVALID)

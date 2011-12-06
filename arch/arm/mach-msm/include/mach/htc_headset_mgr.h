@@ -22,6 +22,7 @@
 
 #include <mach/msm_rpcrouter.h>
 
+#include <linux/earlysuspend.h>
 #include <linux/input.h>
 #include <linux/switch.h>
 #include <linux/wakelock.h>
@@ -74,12 +75,28 @@
 #define BIT_HDMI_CABLE		(1 << 11)
 #define BIT_HDMI_AUDIO		(1 << 12)
 #define BIT_USB_AUDIO_OUT	(1 << 13)
+#define BIT_UNDEFINED		(1 << 14)
 
 #define MASK_HEADSET		(BIT_HEADSET | BIT_HEADSET_NO_MIC)
 #define MASK_35MM_HEADSET	(BIT_HEADSET | BIT_HEADSET_NO_MIC | \
 				BIT_35MM_HEADSET | BIT_TV_OUT)
 #define MASK_FM_ATTRIBUTE	(BIT_FM_HEADSET | BIT_FM_SPEAKER)
 #define MASK_USB_HEADSET	(BIT_USB_AUDIO_OUT)
+
+#define GOOGLE_BIT_HEADSET		(1 << 0)
+#define GOOGLE_BIT_HEADSET_NO_MIC	(1 << 1)
+#define GOOGLE_BIT_USB_HEADSET_ANLG	(1 << 2)
+#define GOOGLE_BIT_USB_HEADSET_DGTL	(1 << 3)
+#define GOOGLE_BIT_HDMI_AUDIO		(1 << 4)
+
+#define GOOGLE_SUPPORTED_HEADSETS	(GOOGLE_BIT_HEADSET | \
+					GOOGLE_BIT_HEADSET_NO_MIC | \
+					GOOGLE_BIT_USB_HEADSET_ANLG | \
+					GOOGLE_BIT_USB_HEADSET_DGTL | \
+					GOOGLE_BIT_HDMI_AUDIO)
+#define GOOGLE_HEADSETS_WITH_MIC	GOOGLE_BIT_HEADSET
+#define GOOGLE_USB_HEADSETS		(GOOGLE_BIT_USB_HEADSET_ANLG | \
+					GOOGLE_BIT_USB_HEADSET_DGTL)
 
 #define HS_DEF_MIC_ADC_10_BIT		200
 #define HS_DEF_MIC_ADC_15_BIT_MAX	25320
@@ -140,9 +157,16 @@ enum {
 	HEADSET_MIC		= 2,
 	HEADSET_METRICO		= 3,
 	HEADSET_UNKNOWN_MIC	= 4,
-	HEADSET_TV_OUT		= 5,
-	HEADSET_BEATS		= 6,
+	HEADSET_UNSTABLE	= 5,
+	HEADSET_TV_OUT		= 6,
 	HEADSET_INDICATOR	= 7,
+	HEADSET_BEATS		= 8,
+	HEADSET_BEATS_SOLO	= 9,
+};
+
+enum {
+	GOOGLE_USB_AUDIO_UNPLUG	= 0,
+	GOOGLE_USB_AUDIO_ANLG	= 1,
 };
 
 enum {
@@ -155,6 +179,7 @@ enum {
 	HEADSET_REG_MIC_SELECT,
 	HEADSET_REG_KEY_INT_ENABLE,
 	HEADSET_REG_KEY_ENABLE,
+	HEADSET_REG_INDICATOR_ENABLE,
 };
 
 enum {
@@ -222,6 +247,7 @@ struct hs_notifier_func {
 	void (*mic_select)(int);
 	int (*key_int_enable)(int);
 	void (*key_enable)(int);
+	int (*indicator_enable)(int);
 };
 
 struct htc_headset_mgr_platform_data {
@@ -234,11 +260,15 @@ struct htc_headset_mgr_platform_data {
 	unsigned int hptv_det_hp_gpio;
 	unsigned int hptv_det_tv_gpio;
 	unsigned int hptv_sel_gpio;
+
+	void (*headset_init)(void);
+	void (*headset_power)(int);
 };
 
 struct htc_headset_mgr_info {
 	struct htc_headset_mgr_platform_data pdata;
 	int driver_init_seq;
+	struct early_suspend early_suspend;
 	struct wake_lock hs_wake_lock;
 
 	unsigned long hpin_jiffies;
@@ -252,7 +282,8 @@ struct htc_headset_mgr_info {
 	struct device *debug_dev;
 	struct mutex mutex_lock;
 
-	struct switch_dev sdev;
+	struct switch_dev sdev_h2w;
+	struct switch_dev sdev_usb_audio;
 	struct input_dev *input;
 	unsigned long insert_jiffies;
 
@@ -272,6 +303,7 @@ struct htc_headset_mgr_info {
 	int mic_bias_state;
 	int mic_detect_counter;
 	int metrico_status; /* For HW Metrico lab test */
+	int quick_boot_status;
 };
 
 int headset_notifier_register(struct headset_notifier *notifier);
@@ -294,5 +326,9 @@ int headset_get_type(void);
 int headset_get_type_sync(int count, unsigned int interval);
 
 extern int switch_send_event(unsigned int bit, int on);
+
+#if defined(CONFIG_FB_MSM_TVOUT) && defined(CONFIG_ARCH_MSM8X60)
+extern void tvout_enable_detection(unsigned int on);
+#endif
 
 #endif
