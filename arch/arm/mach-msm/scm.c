@@ -194,6 +194,7 @@ static u32 smc(u32 cmd_addr)
 		__asmeq("%1", "r0")
 		__asmeq("%2", "r1")
 		__asmeq("%3", "r2")
+		".arch_extension sec\n"
 		"1:smc	#0	@ switch to secure world\n"
 		"cmp	r0, #1				\n"
 		"beq	1b				\n"
@@ -288,6 +289,7 @@ u32 scm_get_version(void)
 		__asmeq("%0", "r1")
 		__asmeq("%1", "r0")
 		__asmeq("%2", "r1")
+		".arch_extension sec\n"
 		"1:smc	#0	@ switch to secure world\n"
 		"cmp	r0, #1				\n"
 		"beq	1b				\n"
