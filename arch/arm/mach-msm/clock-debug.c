@@ -97,7 +97,7 @@ static int clock_debug_local_get(void *data, u64 *val)
 
 DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
 			NULL, "%llu\n");
-
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_base;
 static u32 debug_suspend;
 static struct list_head *clocks_ptr;
@@ -138,7 +138,7 @@ void clock_debug_print_enabled(void)
 		pr_info("No clocks enabled.\n");
 
 }
-
+#endif
 static int list_rates_show(struct seq_file *m, void *unused)
 {
 	struct clk *clock = m->private;
@@ -161,7 +161,7 @@ static const struct file_operations list_rates_fops = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
-
+#ifdef CONFIG_DEBUG_FS
 int __init clock_debug_add(struct clk *clock)
 {
 	char temp[50], *ptr;
@@ -205,3 +205,4 @@ error:
 	debugfs_remove_recursive(clk_dir);
 	return -ENOMEM;
 }
+#endif

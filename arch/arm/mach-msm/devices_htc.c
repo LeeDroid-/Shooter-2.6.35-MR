@@ -394,8 +394,10 @@ int __init msm_add_serial_devices(unsigned num)
 {
 	if (num > MSM_SERIAL_NUM)
 		return -EINVAL;
-
-	return platform_device_register(msm_serial_devices[num]);
+	if (num)
+		return platform_device_register(msm_serial_devices[num]);
+	else
+		return -EINVAL;
 }
 #endif
 

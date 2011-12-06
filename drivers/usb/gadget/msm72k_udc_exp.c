@@ -110,10 +110,10 @@ static const char *const ep_name[] = {
 	"ep8in", "ep9in", "ep10in", "ep11in",
 	"ep12in", "ep13in", "ep14in", "ep15in"
 };
-
+#ifdef CONFIG_DEBUG_FS
 /*To release the wakelock from debugfs*/
 static int release_wlocks;
-
+#endif
 static int use_mfg_serialno;
 static char mfg_df_serialno[16];
 static struct wake_lock vbus_idle_wake_lock;

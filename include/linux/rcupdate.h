@@ -464,6 +464,12 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
 		(p) = (v); \
 	})
 
+#define rcu_assign_pointer_nonull(p, v) \
+	({ \
+		if (!__builtin_constant_p(v)) \
+			smp_wmb(); \
+		(p) = (v); \
+	})
 /* Infrastructure to implement the synchronize_() primitives. */
 
 struct rcu_synchronize {

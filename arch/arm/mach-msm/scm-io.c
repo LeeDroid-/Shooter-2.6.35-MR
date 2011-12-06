@@ -39,6 +39,7 @@ static u32 __secure_readl(u32 addr)
 		__asmeq("%1", "r0")
 		__asmeq("%2", "r1")
 		__asmeq("%3", "r2")
+		".arch_extension sec\n"
 		"smc    #0      @ switch to secure world\n"
 		: "=r" (r0)
 		: "r" (r0), "r" (r1), "r" (r2)
@@ -74,6 +75,7 @@ static void __secure_writel(u32 v, u32 addr)
 		__asmeq("%1", "r1")
 		__asmeq("%2", "r2")
 		__asmeq("%3", "r3")
+		".arch_extension sec\n"
 		"smc    #0      @ switch to secure world\n"
 		: /* No return value */
 		: "r" (r0), "r" (r1), "r" (r2), "r" (r3)

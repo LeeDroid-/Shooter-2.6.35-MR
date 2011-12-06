@@ -2629,7 +2629,7 @@ static int regulator_debug_create_directory(struct regulator_dev *regulator_dev)
 		mode |= S_IRUGO;
 	if (reg_ops->enable || reg_ops->disable)
 		mode |= S_IWUSR;
-	if (mode)
+	//if (mode)
 		err_ptr = debugfs_create_file("enable", mode, reg_subdir,
 						reg, &reg_enable_fops);
 	if (IS_ERR(err_ptr)) {

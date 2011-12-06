@@ -2096,10 +2096,12 @@ static void choose_service_tree(struct cfq_data *cfqd, struct cfq_group *cfqg)
 	 * all the queues in the same priority class
 	 */
 	group_slice = cfq_group_slice(cfqd, cfqg);
-
-	slice = group_slice * count /
-		max_t(unsigned, cfqg->busy_queues_avg[cfqd->serving_prio],
-		      cfq_group_busy_queues_wl(cfqd->serving_prio, cfqd, cfqg));
+	if (cfqd)
+		slice = group_slice * count /
+			max_t(unsigned, cfqg->busy_queues_avg[cfqd->serving_prio],
+			      cfq_group_busy_queues_wl(cfqd->serving_prio, cfqd, cfqg));
+	else
+		slice = 0;
 
 	if (cfqd->serving_type == ASYNC_WORKLOAD) {
 		unsigned int tmp;

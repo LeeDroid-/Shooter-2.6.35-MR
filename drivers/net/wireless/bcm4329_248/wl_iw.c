@@ -1029,7 +1029,7 @@ static int btcoex_dhcp_timer_start(struct net_device *dev)
 //#ifdef BTCOEX_TIMER_ENABLED
 	static char ioctlbuf[MAX_WLIW_IOCTL_LEN];
 	char buf_reg12va_sco_time[4] = { 12, 0, 0, 0};
-	int sco_lasttime = 0;
+	unsigned int sco_lasttime = 0;
 	int ret;
 
 	bcm_mkiovar("btc_params", (char*)&buf_reg12va_sco_time[0], sizeof(buf_reg12va_sco_time), ioctlbuf, sizeof(ioctlbuf));
@@ -6048,12 +6048,24 @@ wl_iw_set_pmksa(
 		if ((pmkid_list.pmkids.npmkid > 0) && (i < pmkid_list.pmkids.npmkid)) {
 			bzero(&pmkid_list.pmkids.pmkid[i], sizeof(pmkid_t));
 			for (; i < (pmkid_list.pmkids.npmkid - 1); i++) {
-				bcopy(&pmkid_list.pmkids.pmkid[i+1].BSSID,
-					&pmkid_list.pmkids.pmkid[i].BSSID,
-					ETHER_ADDR_LEN);
-				bcopy(&pmkid_list.pmkids.pmkid[i+1].PMKID,
-					&pmkid_list.pmkids.pmkid[i].PMKID,
+				if (i == 0)
+				{
+					bcopy(&pmkid_list.foo[0].BSSID,
+						&pmkid_list.pmkids.pmkid[i].BSSID,
+						ETHER_ADDR_LEN);
+					bcopy(&pmkid_list.foo[0].PMKID,
+						&pmkid_list.pmkids.pmkid[i].PMKID,
+						WPA2_PMKID_LEN);
+				}
+				else
+				{
+					bcopy(&pmkid_list.foo[i+1].BSSID,
+						&pmkid_list.foo[i].BSSID,
+						ETHER_ADDR_LEN);
+					bcopy(&pmkid_list.foo[i+1].PMKID,
+						&pmkid_list.foo[i].PMKID,
 					WPA2_PMKID_LEN);
+				}
 			}
 			pmkid_list.pmkids.npmkid--;
 		}

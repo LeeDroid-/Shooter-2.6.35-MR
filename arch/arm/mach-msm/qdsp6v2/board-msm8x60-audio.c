@@ -1370,11 +1370,13 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_hs_dual_mic_broadside_device,
 	&msm_spkr_dual_mic_broadside_device,
 	&msm_ihs_stereo_speaker_stereo_rx_device,
+#ifdef CONFIG_DEBUG_FS
 	&msm_headset_mono_ab_cpls_device,
 	&msm_iheadset_ispeaker_rx_device,
 	&msm_bmic_tx_device,
-	&msm_anc_headset_device,
 	&msm_real_stereo_tx_device,
+#endif
+	&msm_anc_headset_device,
 	&msm_ihac_device,
 	&msm_nomic_headset_tx_device,
 	&msm_nomic_headset_stereo_device,

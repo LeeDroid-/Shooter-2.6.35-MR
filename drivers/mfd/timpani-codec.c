@@ -1461,12 +1461,12 @@ static int adie_codec_write(u8 reg, u8 mask, u8 val)
 
 	return -EIO;
 }
-
+#ifdef CONFIG_DEBUG_FS
 static int adie_codec_read(u8 reg, u8 *val)
 {
 	return marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
 }
-
+#endif
 static int timpani_adie_codec_setpath(struct adie_codec_path *path_ptr,
 					u32 freq_plan, u32 osr)
 {
