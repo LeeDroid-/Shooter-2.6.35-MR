@@ -537,7 +537,9 @@ static int sii9234_probe(struct i2c_client *client,
 		ret = -EIO;
 		goto err_set_irq_wake;
 	}
-	pInfo->wq = create_workqueue("mhl_sii9234_wq");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//pInfo->wq = create_workqueue("mhl_sii9234_wq");
+	pInfo->wq = create_singlethread_workqueue("mhl_sii9234_wq");
 	if (!pInfo->wq)
 	{
 		pr_err("%s: can't create workqueue\n", __func__);

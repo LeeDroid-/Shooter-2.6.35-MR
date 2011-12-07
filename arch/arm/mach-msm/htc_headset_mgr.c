@@ -1492,14 +1492,18 @@ static int htc_headset_mgr_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_usb_audio_switch_dev_register;
 
-	detect_wq = create_workqueue("detect");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//detect_wq = create_workqueue("detect");
+	detect_wq = create_singlethread_workqueue("detect");
 	if (detect_wq == NULL) {
 		ret = -ENOMEM;
 		HS_ERR("Failed to create detect workqueue");
 		goto err_create_detect_work_queue;
 	}
 
-	button_wq = create_workqueue("button");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//button_wq = create_workqueue("button");
+	button_wq = create_singlethread_workqueue("button");
 	if (button_wq  == NULL) {
 		ret = -ENOMEM;
 		HS_ERR("Failed to create button workqueue");

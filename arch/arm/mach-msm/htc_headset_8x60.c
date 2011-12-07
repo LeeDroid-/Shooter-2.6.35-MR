@@ -182,7 +182,9 @@ static int htc_headset_8x60_probe(struct platform_device *pdev)
 
 	wake_lock_init(&hi->hs_wake_lock, WAKE_LOCK_SUSPEND, DRIVER_NAME);
 
-	button_wq = create_workqueue("HS_8X60_BUTTON");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//button_wq = create_workqueue("HS_8X60_BUTTON");
+	button_wq = create_singlethread_workqueue("HS_8X60_BUTTON");
 	if (button_wq == NULL) {
 		ret = -ENOMEM;
 		HS_ERR("Failed to create button workqueue");

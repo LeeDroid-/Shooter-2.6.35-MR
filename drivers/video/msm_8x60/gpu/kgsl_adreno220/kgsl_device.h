@@ -216,7 +216,9 @@ kgsl_get_mmu(struct kgsl_device *device)
 static inline int kgsl_create_device_workqueue(struct kgsl_device *device)
 {
 	KGSL_DRV_INFO("creating workqueue: %s\n", device->name);
-	device->work_queue = create_workqueue(device->name);
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//device->work_queue = create_workqueue(device->name);
+	device->work_queue = create_singlethread_workqueue(device->name);
 	if (!device->work_queue) {
 		KGSL_DRV_ERR("Failed to create workqueue %s\n",
 				device->name);

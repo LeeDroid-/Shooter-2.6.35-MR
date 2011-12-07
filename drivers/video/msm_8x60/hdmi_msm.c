@@ -3883,7 +3883,9 @@ static int __init hdmi_msm_init(void)
 #ifdef CONFIG_FB_MSM_HDMI_3D
 	external_common_state->switch_3d = hdmi_msm_switch_3d;
 #endif
-	hdmi_work_queue = create_workqueue("hdmi_hdcp");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//hdmi_work_queue = create_workqueue("hdmi_hdcp");
+	hdmi_work_queue = create_singlethread_workqueue("hdmi_hdcp");
 	external_common_state->hpd_feature = hdmi_msm_hpd_feature;
 
 	rc = platform_driver_register(&this_driver);

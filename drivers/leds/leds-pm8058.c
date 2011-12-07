@@ -449,7 +449,10 @@ static int pm8058_led_probe(struct platform_device *pdev)
 
 	wake_lock_init(&pmic_led_wake_lock, WAKE_LOCK_SUSPEND, "pmic_led");
 
-	g_led_work_queue = create_workqueue("led");
+	// faux123, no need to have a multi-thread/multi-cpu bound work queue!
+	//g_led_work_queue = create_workqueue("led");
+	g_led_work_queue = create_singlethread_workqueue("led");
+	
 	if (!g_led_work_queue)
 		goto err_create_work_queue;
 
