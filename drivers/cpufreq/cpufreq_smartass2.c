@@ -43,7 +43,7 @@
  * towards the ideal frequency and slower after it has passed it. Similarly,
  * lowering the frequency towards the ideal frequency is faster than below it.
  */
-#define DEFAULT_AWAKE_IDEAL_FREQ 518400
+#define DEFAULT_AWAKE_IDEAL_FREQ 1188000
 static unsigned int awake_ideal_freq;
 
 /*
@@ -60,7 +60,7 @@ static unsigned int sleep_ideal_freq;
  * Zero disables and causes to always jump straight to max frequency.
  * When below the ideal freqeuncy we always ramp up to the ideal freq.
  */
-#define DEFAULT_RAMP_UP_STEP 128000
+#define DEFAULT_RAMP_UP_STEP 108000
 static unsigned int ramp_up_step;
 
 /*
@@ -68,33 +68,33 @@ static unsigned int ramp_up_step;
  * Zero disables and will calculate ramp down according to load heuristic.
  * When above the ideal freqeuncy we always ramp down to the ideal freq.
  */
-#define DEFAULT_RAMP_DOWN_STEP 256000
+#define DEFAULT_RAMP_DOWN_STEP 162000
 static unsigned int ramp_down_step;
 
 /*
  * CPU freq will be increased if measured load > max_cpu_load;
  */
-#define DEFAULT_MAX_CPU_LOAD 75
+#define DEFAULT_MAX_CPU_LOAD 70
 static unsigned long max_cpu_load;
 
 /*
  * CPU freq will be decreased if measured load < min_cpu_load;
  */
-#define DEFAULT_MIN_CPU_LOAD 35
+#define DEFAULT_MIN_CPU_LOAD 30
 static unsigned long min_cpu_load;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp up.
  * Notice we ignore this when we are below the ideal frequency.
  */
-#define DEFAULT_UP_RATE_US 48000;
+#define DEFAULT_UP_RATE_US 35000;
 static unsigned long up_rate_us;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  * Notice we ignore this when we are above the ideal frequency.
  */
-#define DEFAULT_DOWN_RATE_US 99000;
+#define DEFAULT_DOWN_RATE_US 75000;
 static unsigned long down_rate_us;
 
 /*
