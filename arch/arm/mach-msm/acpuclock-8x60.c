@@ -53,7 +53,7 @@
  * used for calibration should respect these limits. */
 #define L_VAL_SCPLL_CAL_MIN	0x08 /* =  432 MHz with 27MHz source */
 #ifdef CONFIG_NUTTER_MODE
-#define L_VAL_SCPLL_CAL_MAX	0x25 /* = 1998 MHz with 27MHz source */
+#define L_VAL_SCPLL_CAL_MAX	0x24 /* = 1944 MHz with 27MHz source */
 #else
 #define L_VAL_SCPLL_CAL_MAX	0x1C /* = 1512 MHz with 27MHz source */
 #endif
@@ -256,7 +256,6 @@ static struct clkctl_acpu_speed acpu_freq_tbl_oc[] = {
   { {1, 1}, 1836000,  ACPU_SCPLL, 0, 0, 1, 0x22, L2(22), 1337500, 0x03006000},
   { {1, 1}, 1890000,  ACPU_SCPLL, 0, 0, 1, 0x23, L2(22), 1350000, 0x03006000},
   { {1, 1}, 1944000,  ACPU_SCPLL, 0, 0, 1, 0x24, L2(22), 1375000, 0x03006000},
-  { {1, 1}, 1998000,  ACPU_SCPLL, 0, 0, 1, 0x25, L2(22), 1375000, 0x03006000},
 #endif
   { {0, 0}, 0 },
 };
@@ -929,7 +928,7 @@ static unsigned int __init select_freq_plan(void)
 
 #ifdef CONFIG_NUTTER_MODE
 	acpu_freq_tbl = acpu_freq_tbl_oc;
-	max_khz = 1998000;
+	max_khz = 1944000;
 #else
 	acpu_freq_tbl = acpu_freq_tbl_oc;
 	max_khz = 1512000;
