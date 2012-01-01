@@ -1402,12 +1402,10 @@ config CPU_VOLTAGE_TABLE
 	default n
 
 config NUTTER_MODE
-	bool "Enable Overclocking above 1728MHz"
+	bool "Enable Overclocking above 1536MHz"
 	default n
 	help
-	  Default Max OC is 1728MHz, enabling this option will allow
-	  OC up to 1914MHz, this is potentially unsafe and could cause
-	  damage to your CPU.
+	  Enabling this option will allow OC up to 1998MHz.
 
 if CPU_FREQ_MSM
 
