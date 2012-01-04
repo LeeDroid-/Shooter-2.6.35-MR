@@ -222,6 +222,36 @@ int pm8901_write(struct pm8901_chip *chip, u16 addr, u8 *values,
 }
 EXPORT_SYMBOL(pm8901_write);
 #endif /*CONFIG_MSM8X60_SSBI*/
+
+int pm8901_preload_dVdd(void)
+{
+	int rc;
+	u8 reg;
+
+	if (pmic_chip == NULL) {
+		pr_err("%s: Error: PMIC 8901 driver has not probed\n",
+			__func__);
+		return -ENODEV;
+	}
+
+	reg = 0x0F;
+	rc = ssbi_write(pmic_chip->dev, 0x0BD, &reg, 1);
+	if (rc)
+		pr_err("%s: ssbi_write failed for 0x0BD, rc=%d\n", __func__,
+			rc);
+
+	reg = 0xB4;
+	rc = ssbi_write(pmic_chip->dev, 0x001, &reg, 1);
+	if (rc)
+		pr_err("%s: ssbi_write failed for 0x001, rc=%d\n", __func__,
+			rc);
+
+	pr_info("%s: dVdd preloaded\n", __func__);
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8901_preload_dVdd);
+
 int pm8901_irq_get_rt_status(struct pm8901_chip *chip, int irq)
 {
 	int     rc;
