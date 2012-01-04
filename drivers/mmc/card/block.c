@@ -666,7 +666,7 @@ static int sd_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	int try_recovery = 1, do_reinit = 0, do_remove = 0;
 
 #ifdef CONFIG_MMC_PERF_PROFILING
-	ktime_t start,diff;
+	ktime_t start={.tv64=0},diff;
 #endif
 
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
