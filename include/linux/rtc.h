@@ -148,9 +148,6 @@ struct rtc_class_ops {
 	int (*read_callback)(struct device *, int data);
 	int (*alarm_irq_enable)(struct device *, unsigned int enabled);
 	int (*update_irq_enable)(struct device *, unsigned int enabled);
-#ifdef CONFIG_BUILD_CIQ
-	int (*read_ticks)(struct device *, struct timespec *);
-#endif
 };
 
 #define RTC_DEVICE_NAME_SIZE 20
@@ -226,9 +223,6 @@ extern int rtc_update_irq_enable(struct rtc_device *rtc, unsigned int enabled);
 extern int rtc_alarm_irq_enable(struct rtc_device *rtc, unsigned int enabled);
 extern int rtc_dev_update_irq_enable_emul(struct rtc_device *rtc,
 						unsigned int enabled);
-#ifdef CONFIG_BUILD_CIQ
-extern int rtc_read_ticks(struct rtc_device *rtc, struct timespec *ticks);
-#endif
 
 typedef struct rtc_task {
 	void (*func)(void *private_data);

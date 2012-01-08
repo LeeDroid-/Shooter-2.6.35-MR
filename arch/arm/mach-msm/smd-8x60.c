@@ -89,11 +89,6 @@ enum {
 	SMSM_APPS_DEM_I = 3,
 };
 
-#ifdef CONFIG_BUILD_CIQ
-static int msm_smd_ciq_info;
-module_param_named(ciq_info, msm_smd_ciq_info,
-		   int, S_IRUGO | S_IWUSR | S_IWGRP);
-#endif
 
 static int msm_smd_debug_mask;
 module_param_named(debug_mask, msm_smd_debug_mask,
@@ -725,11 +720,6 @@ static void handle_smd_irq(struct list_head *list, void (*notify)(void))
 	unsigned tmp;
 	unsigned char state_change;
 
-#ifdef CONFIG_BUILD_CIQ
-	/* put here to make sure we got the disable/enable index */
-	if (!msm_smd_ciq_info)
-		msm_smd_ciq_info = (*(volatile uint32_t *)(MSM_SHARED_RAM_BASE + SMD_CIQ_BASE));
-#endif
 
 	spin_lock_irqsave(&smd_lock, flags);
 	list_for_each_entry(ch, list, ch_list) {
@@ -877,10 +867,6 @@ static int smd_is_packet(struct smd_alloc_elm *alloc_elm)
 	if (!strncmp(alloc_elm->name, "DAL", 3))
 		return 0;
 
-#ifdef CONFIG_BUILD_CIQ
-	if (!strncmp(alloc_elm->name, "DATA20", 6))
-		return 0;
-#endif
 
 	if (alloc_elm->cid > 4 || alloc_elm->cid == 1)
 		return 1;

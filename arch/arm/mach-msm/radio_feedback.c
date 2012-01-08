@@ -98,8 +98,6 @@ typedef struct {
 	uint32_t      	htc_watchdog_status;
 	uint32_t		htc_cdlog_start_addr_for_apps;
 	uint32_t		htc_cdlog_max_size_for_apps;
-
-	uint32_t		    htc_ciq_flag;
 } htc_smem_type;
 
 #define HTC_SMEM_PARAM_BASE_ADDR	0x400F0000

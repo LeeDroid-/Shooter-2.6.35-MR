@@ -528,26 +528,4 @@ int rtc_irq_set_freq(struct rtc_device *rtc, struct rtc_task *task, int freq)
 }
 EXPORT_SYMBOL_GPL(rtc_irq_set_freq);
 
-#ifdef CONFIG_BUILD_CIQ
-int rtc_read_ticks(struct rtc_device *rtc, struct timespec *rtc_xtal_ticks)
-{
-	int err;
 
-	err = mutex_lock_interruptible(&rtc->ops_lock);
-	if (err)
-		return err;
-
-	if (!rtc->ops)
-		err = -ENODEV;
-	else if (!rtc->ops->read_ticks)
-		err = -EINVAL;
-	else {
-		memset(rtc_xtal_ticks, 0, sizeof(struct timespec));
-		err = rtc->ops->read_ticks(rtc->dev.parent, rtc_xtal_ticks);
-	}
-
-	mutex_unlock(&rtc->ops_lock);
-	return err;
-}
-EXPORT_SYMBOL_GPL(rtc_read_ticks);
-#endif

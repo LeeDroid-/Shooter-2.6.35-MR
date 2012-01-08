@@ -66,9 +66,6 @@ static char *smd_ch_name[] = {
 #ifdef CONFIG_BUILD_KDDI
 	[25] = "DATA19",
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	[26] = "DATA20",
-#endif
 	[27] = "GPSNMEA",
 	[36] = "LOOPBACK",
 };
@@ -334,10 +331,6 @@ static int smd_tty_dummy_probe(struct platform_device *pdev)
 	else if (!strcmp(pdev->name, smd_ch_name[25]))
 		complete_all(&smd_tty[25].ch_allocated);
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	else if (!strcmp(pdev->name, smd_ch_name[26]))
-		complete_all(&smd_tty[26].ch_allocated);
-#endif
 	else if (!strcmp(pdev->name, smd_ch_name[27]))
 		complete_all(&smd_tty[27].ch_allocated);
 	else if (!strcmp(pdev->name, "LOOPBACK_TTY"))
@@ -387,9 +380,6 @@ static int __init smd_tty_init(void)
 #ifdef CONFIG_BUILD_KDDI
 	tty_register_device(smd_tty_driver, 25, 0);
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	tty_register_device(smd_tty_driver, 26, 0);
-#endif
 	tty_register_device(smd_tty_driver, 27, 0);
 	tty_register_device(smd_tty_driver, 36, 0);
 
@@ -403,9 +393,7 @@ static int __init smd_tty_init(void)
 #ifdef CONFIG_BUILD_KDDI
 	init_completion(&smd_tty[25].ch_allocated);
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	init_completion(&smd_tty[26].ch_allocated);
-#endif
+
 	init_completion(&smd_tty[27].ch_allocated);
 	init_completion(&smd_tty[36].ch_allocated);
 
@@ -455,14 +443,6 @@ static int __init smd_tty_init(void)
 	if (ret)
 		goto unreg27;
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	smd_tty[26].driver.probe = smd_tty_dummy_probe;
-	smd_tty[26].driver.driver.name = smd_ch_name[26];
-	smd_tty[26].driver.driver.owner = THIS_MODULE;
-	ret = platform_driver_register(&smd_tty[26].driver);
-	if (ret)
-		goto unreg27;
-#endif
 	smd_tty[36].driver.probe = smd_tty_dummy_probe;
 	smd_tty[36].driver.driver.name = "LOOPBACK_TTY";
 	smd_tty[36].driver.driver.owner = THIS_MODULE;
@@ -473,9 +453,6 @@ static int __init smd_tty_init(void)
 	return 0;
 
 unreg27:
-#ifdef CONFIG_BUILD_CIQ
-	platform_driver_unregister(&smd_tty[26].driver);
-#endif
 #ifdef CONFIG_BUILD_KDDI
 	platform_driver_unregister(&smd_tty[25].driver);
 #endif
@@ -501,9 +478,6 @@ out:
 	tty_unregister_device(smd_tty_driver, 21);
 #ifdef CONFIG_BUILD_KDDI
 	tty_unregister_device(smd_tty_driver, 25);
-#endif
-#ifdef CONFIG_BUILD_CIQ
-	tty_unregister_device(smd_tty_driver, 26);
 #endif
 	tty_unregister_device(smd_tty_driver, 27);
 	tty_unregister_device(smd_tty_driver, 36);

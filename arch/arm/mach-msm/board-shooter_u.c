@@ -1982,52 +1982,6 @@ static struct platform_device android_pmem_smipool_device = {
 
 #endif
 
-#ifdef CONFIG_BUILD_CIQ
-static struct android_pmem_platform_data android_pmem_ciq_pdata = {
-	.name = "pmem_ciq",
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq1_pdata = {
-	.name = "pmem_ciq1",
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq2_pdata = {
-	.name = "pmem_ciq2",
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq3_pdata = {
-	.name = "pmem_ciq3",
-	.cached = 0,
-};
-
-static struct platform_device android_pmem_ciq_device = {
-	.name = "android_pmem",
-	.id = 8,
-	.dev = { .platform_data = &android_pmem_ciq_pdata },
-};
-
-static struct platform_device android_pmem_ciq1_device = {
-	.name = "android_pmem",
-	.id = 9,
-	.dev = { .platform_data = &android_pmem_ciq1_pdata },
-};
-
-static struct platform_device android_pmem_ciq2_device = {
-	.name = "android_pmem",
-	.id = 10,
-	.dev = { .platform_data = &android_pmem_ciq2_pdata },
-};
-
-static struct platform_device android_pmem_ciq3_device = {
-	.name = "android_pmem",
-	.id = 11,
-	.dev = { .platform_data = &android_pmem_ciq3_pdata },
-};
-#endif
-
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static struct resource hdmi_msm_resources[] = {
 	{
@@ -2143,43 +2097,7 @@ static void __init msm8x60_allocate_memory_regions(void)
 	}
 #endif
 
-#ifdef CONFIG_BUILD_CIQ
-	size = MSM_PMEM_CIQ_SIZE;
-	if (size) {
-		android_pmem_ciq_pdata.start = MSM_PMEM_CIQ_BASE;
-		android_pmem_ciq_pdata.size = size;
-		pr_info("allocating %lu bytes at %lx physical for user"
-			" smi  pmem arena\n", size,
-			(unsigned long) MSM_PMEM_CIQ_BASE);
-	}
 
-	size = MSM_PMEM_CIQ1_SIZE;
-	if (size) {
-		android_pmem_ciq1_pdata.start = MSM_PMEM_CIQ1_BASE;
-		android_pmem_ciq1_pdata.size = size;
-		pr_info("allocating %lu bytes at %lx physical for user"
-			" smi  pmem arena\n", size,
-			(unsigned long) MSM_PMEM_CIQ1_BASE);
-	}
-
-	size = MSM_PMEM_CIQ2_SIZE;
-	if (size) {
-		android_pmem_ciq2_pdata.start = MSM_PMEM_CIQ2_BASE;
-		android_pmem_ciq2_pdata.size = size;
-		pr_info("allocating %lu bytes at %lx physical for user"
-			" smi  pmem arena\n", size,
-			(unsigned long) MSM_PMEM_CIQ2_BASE);
-	}
-
-	size = MSM_PMEM_CIQ3_SIZE;
-	if (size) {
-		android_pmem_ciq3_pdata.start = MSM_PMEM_CIQ3_BASE;
-		android_pmem_ciq3_pdata.size = size;
-		pr_info("allocating %lu bytes at %lx physical for user"
-			" smi  pmem arena\n", size,
-			(unsigned long) MSM_PMEM_CIQ3_BASE);
-	}
-#endif
 }
 
 #ifdef CONFIG_SERIAL_MSM_HS
@@ -2946,12 +2864,6 @@ static struct platform_device *surf_devices[] __initdata = {
 	&android_pmem_adsp_device,
 	&android_pmem_audio_device,
 	&android_pmem_smipool_device,
-#endif
-#ifdef CONFIG_BUILD_CIQ
-	&android_pmem_ciq_device,
-	&android_pmem_ciq1_device,
-	&android_pmem_ciq2_device,
-	&android_pmem_ciq3_device,
 #endif
 
 #ifdef CONFIG_MSM_ROTATOR

@@ -1677,11 +1677,6 @@ config HTC_ONMODE_CHARGING
 	help
 		support on mode charing icon
 
-config BUILD_CIQ
-        bool "Build in CIQ fixes"
-        default n
-        help
-          For CIQ we need to do some additional fixes.
 
 config HTC_EXTDIAG
 	tristate "HTC Extend Diag Logger"

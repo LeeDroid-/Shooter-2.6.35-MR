@@ -37,10 +37,6 @@
 #define PM8058_RTC_WRITE_BASE	0x1EA
 #define PM8058_RTC_ALARM_BASE	0x1F2
 
-#ifdef CONFIG_BUILD_CIQ
-#define TIMEREMOTE_PROCEEDURE_GET_MILLISECOND_TICK	100
-#endif
-
 #define APP_RTC_PROG			0x30000048
 #define APP_RTC_VER			0x00040000
 #define TIMEREMOTE_PROCEEDURE_SET_JULIAN	6
@@ -420,54 +416,11 @@ pm8058_rtc0_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	return 0;
 }
 
-#ifdef CONFIG_BUILD_CIQ
-static int
-pm8058_timeremote_read_ticks(struct device *dev, struct timespec *ticks)
-{
-	int rc;
-	int64_t get_ticks;
-
-	struct timeremote_get_xtal_ticks_req {
-		struct rpc_request_hdr hdr;
-		uint32_t julian_time_not_null;
-	} req;
-
-	struct timeremote_get_xtal_ticks_rep {
-		struct rpc_reply_hdr hdr;
-		uint32_t sync_ticks;
-	} rep;
-
-	if ((rc = pm8058_init_rpc()) < 0)
-		return rc;
-
-	req.julian_time_not_null = cpu_to_be32(1);
-
-	rc = msm_rpc_call_reply(ep, TIMEREMOTE_PROCEEDURE_GET_MILLISECOND_TICK,
-				&req, sizeof(req),
-				&rep, sizeof(rep),
-				5 * HZ);
-	if (rc < 0){
-		pr_err("%s: read tick fail\n", __func__);
-		return rc;
-	}
-
-	get_ticks = be32_to_cpu(rep.sync_ticks);
-	*ticks = ns_to_timespec(get_ticks*NSEC_PER_MSEC);
-
-	pr_debug("%s ticks to ns: %lld\n",
-			__func__, timespec_to_ns(ticks));
-
-	return 0;
-}
-#endif
 
 static struct rtc_class_ops pm8058_rtc0_ops = {
 	.read_time	= pm8058_rtc0_read_time,
 	.set_alarm	= pm8058_rtc0_set_alarm,
 	.read_alarm	= pm8058_rtc0_read_alarm,
-#ifdef CONFIG_BUILD_CIQ
-	.read_ticks	= pm8058_timeremote_read_ticks,
-#endif
 };
 
 static irqreturn_t pm8058_alarm_trigger(int irq, void *dev_id)
