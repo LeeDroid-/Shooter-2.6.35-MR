@@ -56,6 +56,7 @@
 #define ACOUSTIC_GET_RECEIVER_STATE		_IOW(ACOUSTIC_IOCTL_MAGIC, 37, int)
 #define ACOUSTIC_SET_WB_SAMPLE_RATE		_IOW(ACOUSTIC_IOCTL_MAGIC, 38, int)
 #define ACOUSTIC_GET_SPEAKER_CHANNELS		_IOW(ACOUSTIC_IOCTL_MAGIC, 39, int)
+#define ACOUSTIC_RESET_TIMPANI		_IOW(ACOUSTIC_IOCTL_MAGIC, 40, unsigned)
 
 #define D(fmt, args...) printk(KERN_INFO "[AUD] htc-acoustic: "fmt, ##args)
 #define E(fmt, args...) printk(KERN_ERR "[AUD] htc-acoustic: "fmt, ##args)
@@ -405,6 +406,7 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			memset(tb.spkamp, '\0', PROPERTY_VALUE_MAX);
 			memset(tb.acdb, '\0', PROPERTY_VALUE_MAX);
 			memset(tb.tpa2051, '\0', PROPERTY_VALUE_MAX);
+			memset(tb.codecdspid, '\0', PROPERTY_VALUE_MAX);
 			the_ops->get_acoustic_tables(&tb);
 			if (copy_to_user((void *) arg,
 				&tb, sizeof(tb))) {
@@ -484,7 +486,11 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
-
+	case ACOUSTIC_RESET_TIMPANI: {
+		if (the_ops->reset_timpani)
+			the_ops->reset_timpani();
+		break;
+	}
 	default:
 		rc = -EINVAL;
 	}

@@ -896,10 +896,10 @@ static int snddev_icodec_enable_anc(struct msm_snddev_info *dev_info,
 	if (support_aic3254 || !support_adie)
 		goto error;
 
-	pr_info("%s: enable=%d\n", __func__, enable);
+	pr_aud_info("%s: enable=%d\n", __func__, enable);
 
 	if (!dev_info) {
-		pr_err("invalid dev_info\n");
+		pr_aud_err("invalid dev_info\n");
 		rc = -EINVAL;
 		goto error;
 	}
@@ -910,7 +910,7 @@ static int snddev_icodec_enable_anc(struct msm_snddev_info *dev_info,
 		mutex_lock(&drv->rx_lock);
 
 		if (!drv->rx_active || !dev_info->opened) {
-			pr_err("dev not active\n");
+			pr_aud_err("dev not active\n");
 			rc = -EPERM;
 			mutex_unlock(&drv->rx_lock);
 			goto error;
@@ -921,7 +921,7 @@ static int snddev_icodec_enable_anc(struct msm_snddev_info *dev_info,
 				cal_block.cal_kvaddr;
 
 			if (reg_writes == NULL) {
-				pr_err("error, no calibration data\n");
+				pr_aud_err("error, no calibration data\n");
 				rc = -1;
 				mutex_unlock(&drv->rx_lock);
 				goto error;
@@ -936,7 +936,7 @@ static int snddev_icodec_enable_anc(struct msm_snddev_info *dev_info,
 		mutex_unlock(&drv->rx_lock);
 	} else {
 		rc = -EINVAL;
-		pr_err("rx and ANC device only\n");
+		pr_aud_err("rx and ANC device only\n");
 	}
 
 error:

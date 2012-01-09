@@ -86,6 +86,7 @@
 #include <mach/htc_headset_mgr.h>
 #include <mach/htc_headset_gpio.h>
 #include <mach/htc_headset_pmic.h>
+#include <mach/htc_headset_misc.h>
 #include <mach/htc_headset_8x60.h>
 #include <linux/i2c/isl9519.h>
 #include <mach/tpa2051d3.h>
@@ -2789,22 +2790,27 @@ static struct platform_device *headset_devices[] = {
 static struct headset_adc_config htc_headset_mgr_config[] = {
 	{
 		.type = HEADSET_MIC,
-		.adc_max = 27404,
-		.adc_min = 22294,
+		.adc_max = 27713,
+		.adc_min = 22092,
 	},
 	{
 		.type = HEADSET_BEATS,
-		.adc_max = 22293,
-		.adc_min = 7976,
+		.adc_max = 22091,
+		.adc_min = 16271,
 	},
 	{
-		.type = HEADSET_MIC,
-		.adc_max = 7975,
-		.adc_min = 666,
+		.type = HEADSET_BEATS_SOLO,
+		.adc_max = 16270,
+		.adc_min = 10045,
+	},
+	{
+		.type = HEADSET_INDICATOR,
+		.adc_max = 10044,
+		.adc_min = 4523,
 	},
 	{
 		.type = HEADSET_NO_MIC,
-		.adc_max = 665,
+		.adc_max = 4522,
 		.adc_min = 0,
 	},
 };

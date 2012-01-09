@@ -79,7 +79,7 @@ void get_anc_cal(struct acdb_cal_block *cal_block)
 	pr_debug("%s\n", __func__);
 
 	if (cal_block == NULL) {
-		pr_err("ACDB=> NULL pointer sent to %s\n", __func__);
+		pr_aud_err("ACDB=> NULL pointer sent to %s\n", __func__);
 		goto done;
 	}
 
@@ -99,7 +99,7 @@ void store_anc_cal(struct cal_block *cal_block)
 	pr_debug("%s,\n", __func__);
 
 	if (cal_block->cal_offset > acdb_data.pmem_len) {
-		pr_err("%s: offset %d is > pmem_len %ld\n",
+		pr_aud_err("%s: offset %d is > pmem_len %ld\n",
 			__func__, cal_block->cal_offset,
 			acdb_data.pmem_len);
 		goto done;
@@ -171,7 +171,7 @@ done:
 
 void get_audproc_cal(int32_t path, struct acdb_cal_block *cal_block)
 {
-	pr_debug("%s, path = %d\n", __func__, path);
+	pr_aud_info("%s, path = %d\n", __func__, path);
 
 	if (cal_block == NULL) {
 		pr_aud_err("ACDB=> NULL pointer sent to %s\n", __func__);
@@ -281,13 +281,13 @@ done:
 
 void get_audvol_cal(int32_t path, struct acdb_cal_block *cal_block)
 {
-	pr_debug("%s, path = %d\n", __func__, path);
+	pr_aud_info("%s, path = %d\n", __func__, path);
 
 	if (cal_block == NULL) {
 		pr_aud_err("ACDB=> NULL pointer sent to %s\n", __func__);
 		goto done;
 	}
-	if (path > MAX_AUDPROC_TYPES) {
+	if (path >= MAX_AUDPROC_TYPES) {
 		pr_aud_err("ACDB=> Bad path sent to %s, path: %d\n",
 			__func__, path);
 		goto done;
@@ -530,7 +530,7 @@ static int deregister_pmem(void)
 			buffer.buf_size, NUM_AUDPROC_BUFFERS);
 
 	if (result < 0)
-		pr_err("Audcal unmap did not work!\n");
+		pr_aud_err("Audcal unmap did not work!\n");
 
 	if (acdb_data.pmem_fd) {
 		put_pmem_file(acdb_data.file);
@@ -549,7 +549,7 @@ static int register_pmem(void)
 				&acdb_data.file);
 	if (result != 0) {
 		acdb_data.pmem_fd = 0;
-		pr_err("%s: Could not register PMEM!!!\n", __func__);
+		pr_aud_err("%s: Could not register PMEM!!!\n", __func__);
 		goto done;
 	}
 
@@ -561,7 +561,7 @@ static int register_pmem(void)
 			buffer.buf_size,
 			NUM_AUDPROC_BUFFERS);
 	if (result < 0)
-		pr_err("Audcal mmap did not work!\n");
+		pr_aud_err("Audcal mmap did not work!\n");
 	goto done;
 
 done:
@@ -698,18 +698,26 @@ done:
 static int acdb_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	int result = 0;
+	int size = vma->vm_end - vma->vm_start;
 
 	pr_debug("%s\n", __func__);
 
 	mutex_lock(&acdb_data.acdb_mutex);
 	if (acdb_data.pmem_fd) {
-		result = remap_pfn_range(vma,
-			    vma->vm_start,
-			    acdb_data.paddr >> PAGE_SHIFT,
-			    acdb_data.pmem_len,
-			    vma->vm_page_prot);
+		if (size <= acdb_data.pmem_len) {
+			vma->vm_page_prot = pgprot_noncached(
+						vma->vm_page_prot);
+			result = remap_pfn_range(vma,
+				    vma->vm_start,
+				    acdb_data.paddr >> PAGE_SHIFT,
+				    size,
+				    vma->vm_page_prot);
+		} else {
+			pr_aud_err("%s: Not enough PMEM memory!\n", __func__);
+			result = -ENOMEM;
+		}
 	} else {
-		pr_err("%s: PMEM is not allocated, yet!\n", __func__);
+		pr_aud_err("%s: PMEM is not allocated, yet!\n", __func__);
 		result = -ENODEV;
 	}
 	mutex_unlock(&acdb_data.acdb_mutex);

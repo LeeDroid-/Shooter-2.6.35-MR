@@ -96,6 +96,7 @@
 #define AUDIO_SET_RX_MUTE              _IOW(AUDIO_IOCTL_MAGIC, 42, unsigned)
 #define AUDIO_GET_BITSTREAM_ERROR_INFO _IOR(AUDIO_IOCTL_MAGIC, 42, \
 					 struct msm_audio_bitstream_error_info)
+#define AUDIO_NOTIFY_BT_ENABLE         _IOW(AUDIO_IOCTL_MAGIC, 43, unsigned)
 
 /* Qualcomm extensions */
 #define AUDIO_SET_STREAM_CONFIG        _IOW(AUDIO_IOCTL_MAGIC, 80, \

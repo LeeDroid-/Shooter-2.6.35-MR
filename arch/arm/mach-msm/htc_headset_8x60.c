@@ -42,9 +42,7 @@ static int hs_8x60_remote_adc(int *adc)
 						 hi->pdata.adc_mpp,
 						 hi->pdata.adc_amux);
 	if (ret) {
-#if 0 /* ADC function in suspend mode */
 		*adc = -1;
-#endif
 		HS_LOG("Failed to read remote ADC");
 		return 0;
 	}

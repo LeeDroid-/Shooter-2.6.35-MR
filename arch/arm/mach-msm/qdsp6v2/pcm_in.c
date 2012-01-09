@@ -31,16 +31,12 @@
 #include <mach/qdsp6v2/q6asm.h>
 #include <linux/rtc.h>
 
-#define MAX_BUF 2
+#define MAX_BUF 4
 #define BUFSZ (480 * 8)
 #define BUFFER_SIZE_MULTIPLE 4
 #define MIN_BUFFER_SIZE 160
 
 #define VOC_REC_NONE 0xFF
-
-#define AUDIO_GET_VOICE_STATE   _IOR(AUDIO_IOCTL_MAGIC, 55, unsigned)
-#define AUDIO_GET_DEV_DRV_VER	_IOR(AUDIO_IOCTL_MAGIC, 56, unsigned)
-#define DEV_DRV_VER		(8260 << 16 | 1)
 
 struct pcm {
 	struct mutex lock;
@@ -156,18 +152,6 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 		break;
 	}
-	case AUDIO_GET_VOICE_STATE: {
-		int state = 1; // msm_get_voice_state();
-		if (copy_to_user((void *) arg, &state, sizeof(state)))
-			rc = -EFAULT;
-		break;
-	}
-	case AUDIO_GET_DEV_DRV_VER: {
-		unsigned int vers = DEV_DRV_VER;
-		if (copy_to_user((void *) arg, &vers, sizeof(vers)))
-			rc = -EFAULT;
-		break;
-	}
 	case AUDIO_START: {
 		int cnt = 0;
 		if (atomic_read(&pcm->in_enabled)) {
@@ -193,12 +177,12 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		while (cnt++ < pcm->buffer_count)
 			q6asm_read(pcm->ac);
-		pr_info("%s: AUDIO_START session id[%d]\n", __func__,
+		pr_aud_info("%s: AUDIO_START session id[%d]\n", __func__,
 							pcm->ac->session);
 
-                if (pcm->rec_mode != VOC_REC_NONE)
-                        msm_enable_incall_recording(pcm->ac->session,
-                        pcm->rec_mode, pcm->sample_rate, pcm->channel_count);
+		if (pcm->rec_mode != VOC_REC_NONE)
+			msm_enable_incall_recording(pcm->ac->session,
+			pcm->rec_mode, pcm->sample_rate, pcm->channel_count);
 
 		break;
 	}
@@ -237,7 +221,7 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if ((config.buffer_size % (config.channel_count *
 			BUFFER_SIZE_MULTIPLE)) ||
 			(config.buffer_size < MIN_BUFFER_SIZE)) {
-			pr_err("%s: Buffer Size should be multiple of "
+			pr_aud_err("%s: Buffer Size should be multiple of "
 				"[4 * no. of channels] and greater than 160\n",
 				__func__);
 			rc = -EINVAL;
@@ -275,35 +259,38 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (enable_mask & FLUENCE_ENABLE)
 			rc = auddev_cfg_tx_copp_topology(pcm->ac->session,
 					VPM_TX_DM_FLUENCE_COPP_TOPOLOGY);
+		else if (enable_mask & STEREO_RECORD_ENABLE)
+			rc = auddev_cfg_tx_copp_topology(pcm->ac->session,
+					HTC_STEREO_RECORD_TOPOLOGY);
 		else
 			rc = auddev_cfg_tx_copp_topology(pcm->ac->session,
 					DEFAULT_COPP_TOPOLOGY);
 		break;
 	}
+	case AUDIO_SET_INCALL: {
+		if (copy_from_user(&pcm->rec_mode,
+				   (void *) arg,
+				   sizeof(pcm->rec_mode))) {
+			rc = -EFAULT;
+			pr_aud_err("%s: Error copying in-call mode\n", __func__);
+			break;
+		}
 
-        case AUDIO_SET_INCALL: {
-                if (copy_from_user(&pcm->rec_mode,
-                                   (void *) arg,
-                                   sizeof(pcm->rec_mode))) {
-                        rc = -EFAULT;
-                        pr_err("%s: Error copying in-call mode\n", __func__);
-                        break;
-                }
+		if (pcm->rec_mode != VOC_REC_UPLINK &&
+		    pcm->rec_mode != VOC_REC_DOWNLINK &&
+		    pcm->rec_mode != VOC_REC_BOTH) {
+			rc = -EINVAL;
+			pcm->rec_mode = VOC_REC_NONE;
 
-                if (pcm->rec_mode != VOC_REC_UPLINK &&
-                    pcm->rec_mode != VOC_REC_DOWNLINK &&
-                    pcm->rec_mode != VOC_REC_BOTH) {
-                        rc = -EINVAL;
-                        pcm->rec_mode = VOC_REC_NONE;
+			pr_aud_err("%s: Invalid %d in-call rec_mode\n",
+			       __func__, pcm->rec_mode);
+			break;
+		}
 
-                        pr_err("%s: Invalid %d in-call rec_mode\n",
-                               __func__, pcm->rec_mode);
-                        break;
-                }
+		pr_debug("%s: In-call rec_mode %d\n", __func__, pcm->rec_mode);
+		break;
+	}
 
-                pr_debug("%s: In-call rec_mode %d\n", __func__, pcm->rec_mode);
-                break;
-        }
 
 	default:
 		rc = -EINVAL;
@@ -388,7 +375,7 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 	uint32_t size = 0;
 	uint32_t idx;
 	int rc = 0;
-        int len = 0;
+	int len = 0;
 
 	if (!atomic_read(&pcm->in_enabled))
 		return -EFAULT;
@@ -398,7 +385,7 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 				(atomic_read(&pcm->in_count) ||
 				atomic_read(&pcm->in_stopped)), 5 * HZ);
 		if (!rc) {
-                        pr_err("%s: wait_event_timeout failed\n", __func__);
+			pr_aud_err("%s: wait_event_timeout failed\n", __func__);
 			goto fail;
 		}
 
@@ -409,34 +396,34 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 		}
 
 		data = q6asm_is_cpu_buf_avail(OUT, pcm->ac, &size, &idx);
-                if (count >= size)
-                        len = size;
-                else {
-                        len = count;
-                        pr_err("%s: short read data[%p]bytesavail[%d]"
-                                "bytesrequest[%d]"
-                                "bytesrejected%d]\n",\
-                                __func__, data, size,
-                                count, (size - count));
-                }
-                if ((len) && data) {
+		if (count >= size)
+			len = size;
+		else {
+			len = count;
+			pr_aud_err("%s: short read data[%p]bytesavail[%d]"
+				"bytesrequest[%d]"
+				"bytesrejected%d]\n",\
+				__func__, data, size,
+				count, (size - count));
+		}
+		if ((len) && data) {
 			offset = pcm->in_frame_info[idx][1];
-                        if (copy_to_user(buf, data+offset, len)) {
-                                pr_err("%s copy_to_user failed len[%d]\n",
-                                                        __func__, len);
+			if (copy_to_user(buf, data+offset, len)) {
+				pr_aud_err("%s copy_to_user failed len[%d]\n",
+							__func__, len);
 				rc = -EFAULT;
 				goto fail;
 			}
-                        count -= len;
-                        buf += len;
-                }
+			count -= len;
+			buf += len;
+		}
 			atomic_dec(&pcm->in_count);
 			memset(&pcm->in_frame_info[idx], 0,
 						sizeof(uint32_t) * 2);
 
 			rc = q6asm_read(pcm->ac);
 			if (rc < 0) {
-                        pr_err("%s q6asm_read fail\n", __func__);
+				pr_aud_err("%s q6asm_read faile\n", __func__);
 				goto fail;
 			}
 			rmb();
@@ -461,11 +448,14 @@ static int pcm_in_release(struct inode *inode, struct file *file)
 	}
 	if (pcm->ac) {
 		mutex_lock(&pcm->lock);
-	        if ((pcm->rec_mode != VOC_REC_NONE) && atomic_read(&pcm->in_enabled)) {
-        	        msm_disable_incall_recording(pcm->ac->session, pcm->rec_mode);
-	                pcm->rec_mode = VOC_REC_NONE;
-	        }
 
+	if ((pcm->rec_mode != VOC_REC_NONE) && atomic_read(&pcm->in_enabled)) {
+		msm_disable_incall_recording(pcm->ac->session, pcm->rec_mode);
+
+		pcm->rec_mode = VOC_REC_NONE;
+	}
+
+ 	
 		/* remove this session from topology list */
 		auddev_cfg_tx_copp_topology(pcm->ac->session,
 				DEFAULT_COPP_TOPOLOGY);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -34,8 +34,8 @@
 #define DIR_TX	2
 #define DIR_RX	1
 
-#define DEVICE_IGNORE	0xff
-#define COPP_IGNORE     0xffffffff
+#define DEVICE_IGNORE	0xffffffff
+#define COPP_IGNORE	0xffffffff
 #define SESSION_IGNORE 0x0UL
 
 /* 8 concurrent sessions with Q6 possible,  session:0
@@ -49,6 +49,8 @@
 #define VOICE_STATE_INVALID 0x0
 #define VOICE_STATE_INCALL 0x1
 #define VOICE_STATE_OFFCALL 0x2
+#define ONE_TO_MANY 1
+#define MANY_TO_ONE 2
 
 struct msm_snddev_info {
 	const char *name;
@@ -226,9 +228,14 @@ int msm_snddev_get_enc_freq(int session_id);
 int msm_set_voice_vol(int dir, s32 volume);
 int msm_set_voice_mute(int dir, int mute);
 int msm_get_voice_state(void);
+int msm_enable_incall_recording(int popp_id, int rec_mode, int rate,
+				int channel_mode);
+int msm_disable_incall_recording(uint32_t popp_id, uint32_t rec_mode);
 void msm_set_voc_freq(int tx_freq, int rx_freq);
 
-int msm_enable_incall_recording(int popp_id, int rec_mode, int rate, int channel_mode);
-int msm_disable_incall_recording(uint32_t popp_id, uint32_t rec_mode);
+struct dev_ctrl_ops {
+	int (*support_opendsp) (void);
+};
 
+void htc_8x60_register_dev_ctrl_ops(struct dev_ctrl_ops *ops);
 #endif

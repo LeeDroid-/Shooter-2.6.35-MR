@@ -31,7 +31,6 @@
 #include <linux/delay.h>
 #include <mach/msm_smd.h>
 #include <mach/qdsp6v2/apr.h>
-#include "q6core.h"
 
 struct dentry *dentry;
 struct apr_svc_ch_dev *handle;

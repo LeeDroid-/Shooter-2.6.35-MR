@@ -107,12 +107,14 @@ enum msm_audio_g729a_frame_type {
 struct msm_audio_mvs_config {
 	uint32_t mvs_mode;
 	uint32_t rate_type;
+	uint32_t dtx_mode;
 };
 
 #define MVS_MAX_VOC_PKT_SIZE 320
 
 struct msm_audio_mvs_frame {
 	uint32_t frame_type;
+	uint32_t frame_rate;
 	uint32_t len;
 	uint8_t voc_pkt[MVS_MAX_VOC_PKT_SIZE];
 

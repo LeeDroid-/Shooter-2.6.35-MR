@@ -910,6 +910,10 @@ static int snd_ctl_elem_user_put(struct snd_kcontrol *kcontrol,
 	struct user_element *ue = kcontrol->private_data;
 	
 	change = memcmp(&ucontrol->value, ue->elem_data, ue->elem_data_size) != 0;
+	if (ue->elem_data_size > sizeof(ucontrol->value)) {
+		snd_printk(KERN_ERR "Data size too large\n");
+		return 0;
+	}
 	if (change)
 		memcpy(ue->elem_data, &ucontrol->value, ue->elem_data_size);
 	return change;

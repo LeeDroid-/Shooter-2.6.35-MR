@@ -206,8 +206,8 @@ static int qcelp_in_open(struct inode *inode, struct file *file)
 	audio = kzalloc(sizeof(struct q6audio_in), GFP_KERNEL);
 
 	if (audio == NULL) {
-		pr_aud_err("%s:session id %d: Could not allocate memory for qcelp\
-				driver\n", __func__, audio->ac->session);
+		pr_aud_err("%s: Could not allocate memory for qcelp\
+				driver\n", __func__);
 		return -ENOMEM;
 	}
 	/* Allocate memory for encoder config param */
@@ -248,8 +248,8 @@ static int qcelp_in_open(struct inode *inode, struct file *file)
 				(void *)audio);
 
 	if (!audio->ac) {
-		pr_aud_err("%s:session id %d: Could not allocate memory for audio\
-				client\n", __func__, audio->ac->session);
+		pr_aud_err("%s: Could not allocate memory for audio\
+				client\n", __func__);
 		kfree(audio->enc_cfg);
 		kfree(audio);
 		return -ENOMEM;

@@ -24,6 +24,7 @@ struct acoustic_tables {
 	char tpa2051[PROPERTY_VALUE_MAX];
 	char tpa2026[PROPERTY_VALUE_MAX];
 	char tpa2028[PROPERTY_VALUE_MAX];
+	char codecdspid[PROPERTY_VALUE_MAX];
 };
 
 struct acoustic_ops {
@@ -38,6 +39,7 @@ struct acoustic_ops {
 	void (*get_acoustic_tables)(struct acoustic_tables *tb);
 	int (*support_aic3254_use_mclk) (void);
 	int (*get_speaker_channels) (void);
+	void (*reset_timpani) (void);
 };
 
 void acoustic_register_ops(struct acoustic_ops *ops);

@@ -143,14 +143,6 @@ static void headset_notifier_update(int id)
 		update_mic_status(HS_DEF_MIC_DETECT_COUNT);
 		break;
 	case HEADSET_REG_MIC_BIAS:
-		if (!hi->pdata.headset_power &&
-		    hi->hs_35mm_type != HEADSET_UNPLUG) {
-			hs_mgr_notifier.mic_bias_enable(1);
-			hi->mic_bias_state = 1;
-			msleep(HS_DELAY_MIC_BIAS);
-			update_mic_status(HS_DEF_MIC_DETECT_COUNT);
-		}
-		break;
 	case HEADSET_REG_MIC_SELECT:
 	case HEADSET_REG_KEY_INT_ENABLE:
 	case HEADSET_REG_KEY_ENABLE:
@@ -538,13 +530,6 @@ static void mic_detect_work_func(struct work_struct *work)
 		return;
 	}
 
-	if (hi->hs_35mm_type == HEADSET_UNSTABLE && hi->mic_detect_counter--) {
-		mutex_unlock(&hi->mutex_lock);
-		queue_delayed_work(detect_wq, &mic_detect_work,
-				   HS_JIFFIES_MIC_DETECT);
-		return;
-	}
-
 	old_state = switch_get_state(&hi->sdev_h2w);
 	if (!(old_state & MASK_35MM_HEADSET)) {
 		HS_LOG("Headset has been removed");
@@ -772,8 +757,8 @@ static void insert_detect_work_func(struct work_struct *work)
 		HS_LOG_TIME("HEADSET_MIC");
 		break;
 	case HEADSET_METRICO:
-		mic = HEADSET_UNSTABLE;
-		HS_LOG_TIME("HEADSET_METRICO (UNSTABLE)");
+		state |= BIT_HEADSET;
+		HS_LOG_TIME("HEADSET_METRICO");
 		break;
 	case HEADSET_UNKNOWN_MIC:
 		state |= BIT_HEADSET_NO_MIC;
@@ -787,12 +772,12 @@ static void insert_detect_work_func(struct work_struct *work)
 #endif
 		break;
 	case HEADSET_BEATS:
-		mic = HEADSET_UNSTABLE;
-		HS_LOG_TIME("HEADSET_BEATS (UNSTABLE)");
+		state |= BIT_HEADSET;
+		HS_LOG_TIME("HEADSET_BEATS");
 		break;
 	case HEADSET_BEATS_SOLO:
-		mic = HEADSET_UNSTABLE;
-		HS_LOG_TIME("HEADSET_BEATS_SOLO (UNSTABLE)");
+		state |= BIT_HEADSET;
+		HS_LOG_TIME("HEADSET_BEATS_SOLO");
 		break;
 	case HEADSET_INDICATOR:
 		HS_LOG_TIME("HEADSET_INDICATOR");
@@ -809,8 +794,6 @@ static void insert_detect_work_func(struct work_struct *work)
 
 	if (mic == HEADSET_UNKNOWN_MIC)
 		update_mic_status(HS_DEF_MIC_DETECT_COUNT);
-	else if (mic == HEADSET_UNSTABLE)
-		update_mic_status(0);
 	else if (mic == HEADSET_INDICATOR) {
 		if (headset_get_type_sync(3, HS_DELAY_SEC) == HEADSET_INDICATOR)
 			HS_LOG("Delay check: HEADSET_INDICATOR");
@@ -851,8 +834,6 @@ int hs_notify_key_event(int key_code)
 	    hi->hs_35mm_type == HEADSET_NO_MIC ||
 	    hi->h2w_35mm_type == HEADSET_NO_MIC)
 		update_mic_status(HS_DEF_MIC_DETECT_COUNT);
-	else if (hi->hs_35mm_type == HEADSET_UNSTABLE)
-		update_mic_status(0);
 	else if (!hs_hpin_stable()) {
 		HS_LOG("IGNORE key %d (Unstable HPIN)", key_code);
 		return 1;
@@ -881,15 +862,9 @@ int hs_notify_key_irq(void)
 		return 1;
 	}
 
-	if (hs_hpin_stable()) {
-		hs_mgr_notifier.remote_adc(&adc);
-		key_code = hs_mgr_notifier.remote_keycode(adc);
-		hs_notify_key_event(key_code);
-	} else if (hi->hs_35mm_type == HEADSET_NO_MIC ||
-		   hi->hs_35mm_type == HEADSET_UNKNOWN_MIC) {
-		HS_LOG("IGNORE key IRQ (Unstable HPIN)");
-		update_mic_status(HS_DEF_MIC_DETECT_COUNT);
-	}
+	hs_mgr_notifier.remote_adc(&adc);
+	key_code = hs_mgr_notifier.remote_keycode(adc);
+	hs_notify_key_event(key_code);
 
 	return 1;
 }
@@ -1004,9 +979,6 @@ static ssize_t headset_state_show(struct device *dev,
 		break;
 	case HEADSET_TV_OUT:
 		state = "headset_tv_out";
-		break;
-	case HEADSET_UNSTABLE:
-		state = "headset_unstable";
 		break;
 	case HEADSET_BEATS:
 		state = "headset_beats";

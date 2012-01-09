@@ -1,8 +1,8 @@
-/* wma audio output device
+/* aac audio output device
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -23,7 +23,7 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 #include <linux/msm_audio.h>
-#include <linux/msm_audio_wma.h>
+#include <linux/msm_audio_aac.h>
 #include <linux/debugfs.h>
 #include <linux/list.h>
 #include <linux/android_pmem.h>
@@ -39,10 +39,10 @@
 
 #define TUNNEL_MODE     0x0000
 #define NON_TUNNEL_MODE 0x0001
-#define AUDWMA_EOS_SET  0x00000001
+#define AUDAAC_EOS_SET  0x00000001
 
 /* Default number of pre-allocated event packets */
-#define AUDWMA_EVENT_NUM 10
+#define AUDAAC_EVENT_NUM 10
 
 #define __CONTAINS(r, v, l) ({					\
 	typeof(r) __r = r;					\
@@ -109,13 +109,13 @@ union  meta_data {
 	struct meta_in meta_in;
 } __attribute__ ((packed));
 
-struct audwma_event {
+struct audaac_event {
 	struct list_head list;
 	int event_type;
 	union msm_audio_event_payload payload;
 };
 
-struct audwma_pmem_region {
+struct audaac_pmem_region {
 	struct list_head list;
 	struct file *file;
 	int fd;
@@ -126,7 +126,7 @@ struct audwma_pmem_region {
 	unsigned ref_cnt;
 };
 
-struct audwma_buffer_node {
+struct audaac_buffer_node {
 	struct list_head list;
 	struct msm_audio_aio_buf buf;
 	unsigned long paddr;
@@ -137,7 +137,7 @@ struct audwma_buffer_node {
 
 struct q6audio;
 
-struct audwma_drv_operations {
+struct audaac_drv_operations {
 	void (*out_flush) (struct q6audio *);
 	void (*in_flush) (struct q6audio *);
 	int (*fsync)(struct q6audio *);
@@ -145,11 +145,11 @@ struct audwma_drv_operations {
 
 #define PCM_BUF_COUNT		(2)
 /* Buffer with meta */
-#define PCM_BUFSZ_MIN		((4*1024) + sizeof(struct dec_meta_out))
+#define PCM_BUFSZ_MIN		((8192) + sizeof(struct dec_meta_out))
 
 /* FRAME_NUM must be a power of two */
 #define FRAME_NUM		(2)
-#define FRAME_SIZE		((4*1024) + sizeof(struct meta_in))
+#define FRAME_SIZE		((4*1536) + sizeof(struct meta_in))
 
 struct q6audio {
 	atomic_t in_bytes;
@@ -158,7 +158,7 @@ struct q6audio {
 	struct msm_audio_stream_config str_cfg;
 	struct msm_audio_buf_cfg        buf_cfg;
 	struct msm_audio_config pcm_cfg;
-	struct msm_audio_wma_config_v2 wma_config;
+	struct msm_audio_aac_config aac_config;
 
 	struct audio_client *ac;
 
@@ -180,7 +180,7 @@ struct q6audio {
 	struct list_head free_event_queue;
 	struct list_head event_queue;
 	struct list_head pmem_region_queue;	/* protected by lock */
-	struct audwma_drv_operations drv_ops;
+	struct audaac_drv_operations drv_ops;
 	union msm_audio_event_payload eos_write_payload;
 
 	uint32_t drv_status;
@@ -196,11 +196,11 @@ struct q6audio {
 };
 
 static int insert_eos_buf(struct q6audio *audio,
-	struct audwma_buffer_node *buf_node) {
+	struct audaac_buffer_node *buf_node) {
 	struct dec_meta_out *eos_buf = buf_node->kvaddr;
 	eos_buf->num_of_frames = 0xFFFFFFFF;
 	eos_buf->meta_out_dsp[0].offset_to_frame = 0x0;
-	eos_buf->meta_out_dsp[0].nflags = AUDWMA_EOS_SET;
+	eos_buf->meta_out_dsp[0].nflags = AUDAAC_EOS_SET;
 	return sizeof(struct dec_meta_out) +
 		sizeof(eos_buf->meta_out_dsp[0]);
 }
@@ -209,7 +209,7 @@ static int insert_eos_buf(struct q6audio *audio,
    for flush operation as DSP output might not have proper
    value set */
 static int insert_meta_data(struct q6audio *audio,
-	struct audwma_buffer_node *buf_node) {
+	struct audaac_buffer_node *buf_node) {
 	struct dec_meta_out *meta_data = buf_node->kvaddr;
 	meta_data->num_of_frames = 0x0;
 	meta_data->meta_out_dsp[0].offset_to_frame = 0x0;
@@ -219,9 +219,9 @@ static int insert_meta_data(struct q6audio *audio,
 }
 
 static void extract_meta_info(struct q6audio *audio,
-	struct audwma_buffer_node *buf_node, int dir)
+	struct audaac_buffer_node *buf_node, int dir)
 {
-	if (dir) { /* Read */
+	if (dir) { /* input buffer - Write */
 		if (audio->buf_cfg.meta_info_enable)
 			memcpy(&buf_node->meta_info.meta_in,
 			(char *)buf_node->kvaddr, sizeof(struct meta_in));
@@ -232,24 +232,26 @@ static void extract_meta_info(struct q6audio *audio,
 			buf_node->meta_info.meta_in.ntimestamp.highpart,
 			buf_node->meta_info.meta_in.ntimestamp.lowpart,
 			buf_node->meta_info.meta_in.nflags);
-	} else { /* Write */
+	} else { /* output buffer - Read */
 		memcpy((char *)buf_node->kvaddr,
 			&buf_node->meta_info.meta_out,
 			sizeof(struct dec_meta_out));
-		pr_debug("o/p: msw_ts 0x%8x lsw_ts 0x%8x nflags 0x%8x\n",
+		pr_debug("o/p: msw_ts 0x%8x lsw_ts 0x%8x nflags 0x%8x,"
+				 "num_frames = %d\n",
 		((struct dec_meta_out *)buf_node->kvaddr)->\
 			meta_out_dsp[0].msw_ts,
 		((struct dec_meta_out *)buf_node->kvaddr)->\
 			meta_out_dsp[0].lsw_ts,
 		((struct dec_meta_out *)buf_node->kvaddr)->\
-			meta_out_dsp[0].nflags);
+			meta_out_dsp[0].nflags,
+		((struct dec_meta_out *)buf_node->kvaddr)->num_of_frames);
 	}
 }
 
-static int audwma_pmem_lookup_vaddr(struct q6audio *audio, void *addr,
-	unsigned long len, struct audwma_pmem_region **region)
+static int audaac_pmem_lookup_vaddr(struct q6audio *audio, void *addr,
+	unsigned long len, struct audaac_pmem_region **region)
 {
-	struct audwma_pmem_region *region_elt;
+	struct audaac_pmem_region *region_elt;
 
 	int match_count = 0;
 
@@ -286,14 +288,14 @@ static int audwma_pmem_lookup_vaddr(struct q6audio *audio, void *addr,
 	return *region ? 0 : -1;
 }
 
-static unsigned long audwma_pmem_fixup(struct q6audio *audio, void *addr,
+static unsigned long audaac_pmem_fixup(struct q6audio *audio, void *addr,
 	unsigned long len, int ref_up, void **kvaddr)
 {
-	struct audwma_pmem_region *region;
+	struct audaac_pmem_region *region;
 	unsigned long paddr;
 	int ret;
 
-	ret = audwma_pmem_lookup_vaddr(audio, addr, len, &region);
+	ret = audaac_pmem_lookup_vaddr(audio, addr, len, &region);
 	if (ret) {
 		pr_aud_err("lookup (%p, %ld) failed\n", addr, len);
 		return 0;
@@ -310,20 +312,20 @@ static unsigned long audwma_pmem_fixup(struct q6audio *audio, void *addr,
 	return paddr;
 }
 
-static void audwma_post_event(struct q6audio *audio, int type,
+static void audaac_post_event(struct q6audio *audio, int type,
 			      union msm_audio_event_payload payload)
 {
-	struct audwma_event *e_node = NULL;
+	struct audaac_event *e_node = NULL;
 	unsigned long flags;
 
 	spin_lock_irqsave(&audio->event_queue_lock, flags);
 
 	if (!list_empty(&audio->free_event_queue)) {
 		e_node = list_first_entry(&audio->free_event_queue,
-					  struct audwma_event, list);
+					  struct audaac_event, list);
 		list_del(&e_node->list);
 	} else {
-		e_node = kmalloc(sizeof(struct audwma_event), GFP_ATOMIC);
+		e_node = kmalloc(sizeof(struct audaac_event), GFP_ATOMIC);
 		if (!e_node) {
 			pr_aud_err("No mem to post event %d\n", type);
 			spin_unlock_irqrestore(&audio->event_queue_lock, flags);
@@ -339,14 +341,14 @@ static void audwma_post_event(struct q6audio *audio, int type,
 	wake_up(&audio->event_wait);
 }
 
-static int audwma_enable(struct q6audio *audio)
+static int audaac_enable(struct q6audio *audio)
 {
 	/* 2nd arg: 0 -> run immediately
 	   3rd arg: 0 -> msw_ts, 4th arg: 0 ->lsw_ts */
 	return q6asm_run(audio->ac, 0x00, 0x00, 0x00);
 }
 
-static int audwma_disable(struct q6audio *audio)
+static int audaac_disable(struct q6audio *audio)
 {
 	int rc = 0;
 	if (audio->opened) {
@@ -367,11 +369,11 @@ static int audwma_disable(struct q6audio *audio)
 	return rc;
 }
 
-static int audwma_pause(struct q6audio *audio)
+static int audaac_pause(struct q6audio *audio)
 {
 	int rc = 0;
 
-	pr_aud_info("%s, enabled = %d\n", __func__,
+	pr_debug("%s, enabled = %d\n", __func__,
 			audio->enabled);
 	if (audio->enabled) {
 		rc = q6asm_cmd(audio->ac, CMD_PAUSE);
@@ -383,7 +385,7 @@ static int audwma_pause(struct q6audio *audio)
 	return rc;
 }
 
-static int audwma_flush(struct q6audio *audio)
+static int audaac_flush(struct q6audio *audio)
 {
 	int rc;
 
@@ -391,7 +393,7 @@ static int audwma_flush(struct q6audio *audio)
 		/* Implicitly issue a pause to the decoder before flushing if
 		   it is not in pause state */
 		if (!(audio->drv_status & ADRV_STATUS_PAUSE)) {
-			rc = audwma_pause(audio);
+			rc = audaac_pause(audio);
 			if (rc < 0)
 				pr_aud_err("%s: pause cmd failed rc=%d\n", __func__,
 					rc);
@@ -403,7 +405,7 @@ static int audwma_flush(struct q6audio *audio)
 			pr_aud_err("%s: flush cmd failed rc=%d\n", __func__, rc);
 		/* Not in stop state, reenable the stream */
 		if (audio->stopped == 0) {
-			rc = audwma_enable(audio);
+			rc = audaac_enable(audio);
 			if (rc)
 				pr_aud_err("%s:audio re-enable failed\n", __func__);
 			else {
@@ -420,8 +422,8 @@ static int audwma_flush(struct q6audio *audio)
 	return 0;
 }
 
-static void audwma_async_read(struct q6audio *audio,
-		struct audwma_buffer_node *buf_node)
+static void audaac_async_read(struct q6audio *audio,
+		struct audaac_buffer_node *buf_node)
 {
 	struct audio_client *ac;
 	struct audio_aio_read_param param;
@@ -443,15 +445,16 @@ static void audwma_async_read(struct q6audio *audio,
 		pr_aud_err("%s:failed\n", __func__);
 }
 
-static void audwma_async_write(struct q6audio *audio,
-		struct audwma_buffer_node *buf_node)
+static void audaac_async_write(struct q6audio *audio,
+		struct audaac_buffer_node *buf_node)
 {
 	int rc;
 	struct audio_client *ac;
 	struct audio_aio_write_param param;
 
-	pr_debug("%s: Send write buff %p phy %lx len %d\n", __func__, buf_node,
-		 buf_node->paddr, buf_node->buf.data_len);
+	pr_debug("%s: Send write buff %p phy %lx len %d, meta_enable = %d\n",
+		__func__, buf_node, buf_node->paddr, buf_node->buf.data_len,
+		audio->buf_cfg.meta_info_enable);
 
 	ac = audio->ac;
 	/* Offset with  appropriate meta */
@@ -473,12 +476,12 @@ static void audwma_async_write(struct q6audio *audio,
 }
 
 /* Write buffer to DSP / Handle Ack from DSP */
-static void audwma_async_write_ack(struct q6audio *audio, uint32_t token,
+static void audaac_async_write_ack(struct q6audio *audio, uint32_t token,
 		uint32_t *payload)
 {
 	unsigned long flags;
 	union msm_audio_event_payload event_payload;
-	struct audwma_buffer_node *used_buf;
+	struct audaac_buffer_node *used_buf;
 
 	/* No active flush in progress */
 	if (audio->wflush)
@@ -487,13 +490,13 @@ static void audwma_async_write_ack(struct q6audio *audio, uint32_t token,
 	spin_lock_irqsave(&audio->dsp_lock, flags);
 	BUG_ON(list_empty(&audio->out_queue));
 	used_buf = list_first_entry(&audio->out_queue,
-				    struct audwma_buffer_node, list);
+				    struct audaac_buffer_node, list);
 	if (token == used_buf->token) {
 		list_del(&used_buf->list);
 		spin_unlock_irqrestore(&audio->dsp_lock, flags);
 		pr_debug("consumed buffer\n");
 		event_payload.aio_buf = used_buf->buf;
-		audwma_post_event(audio, AUDIO_EVENT_WRITE_DONE,
+		audaac_post_event(audio, AUDIO_EVENT_WRITE_DONE,
 				  event_payload);
 		kfree(used_buf);
 		if (list_empty(&audio->out_queue) &&
@@ -509,12 +512,12 @@ static void audwma_async_write_ack(struct q6audio *audio, uint32_t token,
 }
 
 /* Read buffer from DSP / Handle Ack from DSP */
-static void audwma_async_read_ack(struct q6audio *audio, uint32_t token,
+static void audaac_async_read_ack(struct q6audio *audio, uint32_t token,
 		uint32_t *payload)
 {
 	unsigned long flags;
 	union msm_audio_event_payload event_payload;
-	struct audwma_buffer_node *filled_buf;
+	struct audaac_buffer_node *filled_buf;
 
 	/* No active flush in progress */
 	if (audio->rflush)
@@ -527,7 +530,7 @@ static void audwma_async_read_ack(struct q6audio *audio, uint32_t token,
 	spin_lock_irqsave(&audio->dsp_lock, flags);
 	BUG_ON(list_empty(&audio->in_queue));
 	filled_buf = list_first_entry(&audio->in_queue,
-				      struct audwma_buffer_node, list);
+				      struct audaac_buffer_node, list);
 	if (token == (filled_buf->token)) {
 		list_del(&filled_buf->list);
 		spin_unlock_irqrestore(&audio->dsp_lock, flags);
@@ -542,15 +545,16 @@ static void audwma_async_read_ack(struct q6audio *audio, uint32_t token,
 		} else {
 			filled_buf->meta_info.meta_out.num_of_frames =
 				payload[7];
-			pr_debug("nr of frames 0x%8x\n",
-				filled_buf->meta_info.meta_out.num_of_frames);
 			event_payload.aio_buf.data_len = payload[2] + \
 			payload[3] + \
 			sizeof(struct dec_meta_out);
+			pr_debug("nr of frames 0x%8x len=%d\n",
+				filled_buf->meta_info.meta_out.num_of_frames,
+				event_payload.aio_buf.data_len);
 			extract_meta_info(audio, filled_buf, 0);
 			audio->eos_rsp = 0;
 		}
-		audwma_post_event(audio, AUDIO_EVENT_READ_DONE, event_payload);
+		audaac_post_event(audio, AUDIO_EVENT_READ_DONE, event_payload);
 		kfree(filled_buf);
 	} else {
 		pr_aud_err("expected=%lx ret=%x\n", filled_buf->token, token);
@@ -558,7 +562,7 @@ static void audwma_async_read_ack(struct q6audio *audio, uint32_t token,
 	}
 }
 
-static void q6_audwma_cb(uint32_t opcode, uint32_t token,
+static void q6_audaac_cb(uint32_t opcode, uint32_t token,
 		uint32_t *payload, void *priv)
 {
 	struct q6audio *audio = (struct q6audio *)priv;
@@ -567,12 +571,12 @@ static void q6_audwma_cb(uint32_t opcode, uint32_t token,
 	case ASM_DATA_EVENT_WRITE_DONE:
 		pr_debug("%s:ASM_DATA_EVENT_WRITE_DONE token = 0x%x\n",
 			 __func__, token);
-		audwma_async_write_ack(audio, token, payload);
+		audaac_async_write_ack(audio, token, payload);
 		break;
 	case ASM_DATA_EVENT_READ_DONE:
 		pr_debug("%s:ASM_DATA_EVENT_READ_DONE token = 0x%x\n",
 			 __func__, token);
-		audwma_async_read_ack(audio, token, payload);
+		audaac_async_read_ack(audio, token, payload);
 		break;
 	case ASM_DATA_CMDRSP_EOS:
 		/* EOS Handle */
@@ -583,7 +587,7 @@ static void q6_audwma_cb(uint32_t opcode, uint32_t token,
 			   after receiving DSP acknowledgement */
 			if (audio->eos_flag &&
 				(audio->eos_write_payload.aio_buf.buf_addr)) {
-			audwma_post_event(audio, AUDIO_EVENT_WRITE_DONE,
+			audaac_post_event(audio, AUDIO_EVENT_WRITE_DONE,
 						audio->eos_write_payload);
 			memset(&audio->eos_write_payload , 0,
 				sizeof(union msm_audio_event_payload));
@@ -595,6 +599,11 @@ static void q6_audwma_cb(uint32_t opcode, uint32_t token,
 			wake_up(&audio->cmd_wait);
 		}
 		break;
+	case ASM_DATA_CMD_MEDIA_FORMAT_UPDATE:
+	case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
+		pr_debug("%s:payload0[%x] payloa1d[%x]opcode= 0x%x\n",
+			 __func__, payload[0], payload[1], opcode);
+		break;
 	default:
 		pr_debug("%s:Unhandled event = 0x%8x\n", __func__, opcode);
 		break;
@@ -602,9 +611,9 @@ static void q6_audwma_cb(uint32_t opcode, uint32_t token,
 }
 
 /* ------------------- device --------------------- */
-static void audwma_async_out_flush(struct q6audio *audio)
+static void audaac_async_out_flush(struct q6audio *audio)
 {
-	struct audwma_buffer_node *buf_node;
+	struct audaac_buffer_node *buf_node;
 	struct list_head *ptr, *next;
 	union msm_audio_event_payload payload;
 	unsigned long flags;
@@ -616,38 +625,39 @@ static void audwma_async_out_flush(struct q6audio *audio)
 	if (audio->eos_flag && (audio->eos_write_payload.aio_buf.buf_addr)) {
 		pr_debug("%s: EOS followed by flush received,acknowledge eos"\
 			" i/p buffer immediately\n", __func__);
-		audwma_post_event(audio, AUDIO_EVENT_WRITE_DONE,
+		audaac_post_event(audio, AUDIO_EVENT_WRITE_DONE,
 					audio->eos_write_payload);
 		memset(&audio->eos_write_payload , 0,
 			sizeof(union msm_audio_event_payload));
 	}
 	spin_unlock_irqrestore(&audio->dsp_lock, flags);
+
 	list_for_each_safe(ptr, next, &audio->out_queue) {
-		buf_node = list_entry(ptr, struct audwma_buffer_node, list);
+		buf_node = list_entry(ptr, struct audaac_buffer_node, list);
 		list_del(&buf_node->list);
 		payload.aio_buf = buf_node->buf;
-		audwma_post_event(audio, AUDIO_EVENT_WRITE_DONE, payload);
+		audaac_post_event(audio, AUDIO_EVENT_WRITE_DONE, payload);
 		kfree(buf_node);
 		pr_debug("%s: Propagate WRITE_DONE during flush\n", __func__);
 	}
 }
 
-static void audwma_async_in_flush(struct q6audio *audio)
+static void audaac_async_in_flush(struct q6audio *audio)
 {
-	struct audwma_buffer_node *buf_node;
+	struct audaac_buffer_node *buf_node;
 	struct list_head *ptr, *next;
 	union msm_audio_event_payload payload;
 
 	pr_debug("%s\n", __func__);
 	list_for_each_safe(ptr, next, &audio->in_queue) {
-		buf_node = list_entry(ptr, struct audwma_buffer_node, list);
+		buf_node = list_entry(ptr, struct audaac_buffer_node, list);
 		list_del(&buf_node->list);
 		/* Forcefull send o/p eos buffer after flush, if no eos response
 		 * received by dsp even after sending eos command */
 		if ((audio->eos_rsp != 1) && audio->eos_flag) {
 			pr_debug("%s: send eos on o/p buffer during flush\n",\
 				__func__);
-		payload.aio_buf = buf_node->buf;
+			payload.aio_buf = buf_node->buf;
 			payload.aio_buf.data_len =
 					insert_eos_buf(audio, buf_node);
 			audio->eos_flag = 0;
@@ -656,13 +666,13 @@ static void audwma_async_in_flush(struct q6audio *audio)
 			payload.aio_buf.data_len =
 					insert_meta_data(audio, buf_node);
 		}
-		audwma_post_event(audio, AUDIO_EVENT_READ_DONE, payload);
+		audaac_post_event(audio, AUDIO_EVENT_READ_DONE, payload);
 		kfree(buf_node);
 		pr_debug("%s: Propagate READ_DONE during flush\n", __func__);
 	}
 }
 
-static void audwma_ioport_reset(struct q6audio *audio)
+static void audaac_ioport_reset(struct q6audio *audio)
 {
 	if (audio->drv_status & ADRV_STATUS_AIO_INTF) {
 		/* If fsync is in progress, make sure
@@ -678,7 +688,7 @@ static void audwma_ioport_reset(struct q6audio *audio)
 	}
 }
 
-static int audwma_events_pending(struct q6audio *audio)
+static int audaac_events_pending(struct q6audio *audio)
 {
 	unsigned long flags;
 	int empty;
@@ -689,22 +699,22 @@ static int audwma_events_pending(struct q6audio *audio)
 	return empty || audio->event_abort;
 }
 
-static void audwma_reset_event_queue(struct q6audio *audio)
+static void audaac_reset_event_queue(struct q6audio *audio)
 {
 	unsigned long flags;
-	struct audwma_event *drv_evt;
+	struct audaac_event *drv_evt;
 	struct list_head *ptr, *next;
 
 	spin_lock_irqsave(&audio->event_queue_lock, flags);
 	list_for_each_safe(ptr, next, &audio->event_queue) {
 		drv_evt = list_first_entry(&audio->event_queue,
-					   struct audwma_event, list);
+					   struct audaac_event, list);
 		list_del(&drv_evt->list);
 		kfree(drv_evt);
 	}
 	list_for_each_safe(ptr, next, &audio->free_event_queue) {
 		drv_evt = list_first_entry(&audio->free_event_queue,
-					   struct audwma_event, list);
+					   struct audaac_event, list);
 		list_del(&drv_evt->list);
 		kfree(drv_evt);
 	}
@@ -713,11 +723,11 @@ static void audwma_reset_event_queue(struct q6audio *audio)
 	return;
 }
 
-static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
+static long audaac_process_event_req(struct q6audio *audio, void __user * arg)
 {
 	long rc;
 	struct msm_audio_event usr_evt;
-	struct audwma_event *drv_evt = NULL;
+	struct audaac_event *drv_evt = NULL;
 	int timeout;
 	unsigned long flags;
 
@@ -728,7 +738,7 @@ static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
 
 	if (timeout > 0) {
 		rc = wait_event_interruptible_timeout(audio->event_wait,
-						      audwma_events_pending
+						      audaac_events_pending
 						      (audio),
 						      msecs_to_jiffies
 						      (timeout));
@@ -736,7 +746,7 @@ static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
 			return -ETIMEDOUT;
 	} else {
 		rc = wait_event_interruptible(audio->event_wait,
-					      audwma_events_pending(audio));
+					      audaac_events_pending(audio));
 	}
 
 	if (rc < 0)
@@ -752,7 +762,7 @@ static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
 	spin_lock_irqsave(&audio->event_queue_lock, flags);
 	if (!list_empty(&audio->event_queue)) {
 		drv_evt = list_first_entry(&audio->event_queue,
-					   struct audwma_event, list);
+					   struct audaac_event, list);
 		list_del(&drv_evt->list);
 	}
 	if (drv_evt) {
@@ -769,23 +779,24 @@ static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
 	if (drv_evt->event_type == AUDIO_EVENT_WRITE_DONE) {
 		pr_debug("posted AUDIO_EVENT_WRITE_DONE to user\n");
 		mutex_lock(&audio->write_lock);
-		audwma_pmem_fixup(audio, drv_evt->payload.aio_buf.buf_addr,
+		audaac_pmem_fixup(audio, drv_evt->payload.aio_buf.buf_addr,
 				  drv_evt->payload.aio_buf.buf_len, 0, 0);
 		mutex_unlock(&audio->write_lock);
 	} else if (drv_evt->event_type == AUDIO_EVENT_READ_DONE) {
 		pr_debug("posted AUDIO_EVENT_READ_DONE to user\n");
 		mutex_lock(&audio->read_lock);
-		audwma_pmem_fixup(audio, drv_evt->payload.aio_buf.buf_addr,
+		audaac_pmem_fixup(audio, drv_evt->payload.aio_buf.buf_addr,
 				  drv_evt->payload.aio_buf.buf_len, 0, 0);
 		mutex_unlock(&audio->read_lock);
 	}
 
-	/* Some read buffer might be held up in DSP,release all
-	   Once EOS indicated*/
+	/* Some read buffer might be held up in DSP, release all
+	 * once EOS indicated
+	 */
 	if (audio->eos_rsp && !list_empty(&audio->in_queue)) {
 		pr_debug("Send flush command to release read buffers"\
 		"held up in DSP\n");
-		audwma_flush(audio);
+		audaac_flush(audio);
 	}
 
 	if (copy_to_user(arg, &usr_evt, sizeof(usr_evt)))
@@ -794,11 +805,11 @@ static long audwma_process_event_req(struct q6audio *audio, void __user * arg)
 	return rc;
 }
 
-static int audwma_pmem_check(struct q6audio *audio,
+static int audaac_pmem_check(struct q6audio *audio,
 			     void *vaddr, unsigned long len)
 {
-	struct audwma_pmem_region *region_elt;
-	struct audwma_pmem_region t = {.vaddr = vaddr, .len = len };
+	struct audaac_pmem_region *region_elt;
+	struct audaac_pmem_region t = {.vaddr = vaddr, .len = len };
 
 	list_for_each_entry(region_elt, &audio->pmem_region_queue, list) {
 		if (CONTAINS(region_elt, &t) || CONTAINS(&t, region_elt) ||
@@ -816,12 +827,12 @@ static int audwma_pmem_check(struct q6audio *audio,
 	return 0;
 }
 
-static int audwma_pmem_add(struct q6audio *audio,
+static int audaac_pmem_add(struct q6audio *audio,
 			   struct msm_audio_pmem_info *info)
 {
 	unsigned long paddr, kvaddr, len;
 	struct file *file;
-	struct audwma_pmem_region *region;
+	struct audaac_pmem_region *region;
 	int rc = -EINVAL;
 
 	pr_debug("%s:\n", __func__);
@@ -837,7 +848,7 @@ static int audwma_pmem_add(struct q6audio *audio,
 		goto end;
 	}
 
-	rc = audwma_pmem_check(audio, info->vaddr, len);
+	rc = audaac_pmem_check(audio, info->vaddr, len);
 	if (rc < 0) {
 		put_pmem_file(file);
 		kfree(region);
@@ -863,17 +874,17 @@ end:
 	return rc;
 }
 
-static int audwma_pmem_remove(struct q6audio *audio,
+static int audaac_pmem_remove(struct q6audio *audio,
 			      struct msm_audio_pmem_info *info)
 {
-	struct audwma_pmem_region *region;
+	struct audaac_pmem_region *region;
 	struct list_head *ptr, *next;
 	int rc = -EINVAL;
 
 	pr_debug("info fd %d vaddr %p\n", info->fd, info->vaddr);
 
 	list_for_each_safe(ptr, next, &audio->pmem_region_queue) {
-		region = list_entry(ptr, struct audwma_pmem_region, list);
+		region = list_entry(ptr, struct audaac_pmem_region, list);
 
 		if ((region->fd == info->fd) &&
 			(region->vaddr == info->vaddr)) {
@@ -901,11 +912,11 @@ static int audwma_pmem_remove(struct q6audio *audio,
 }
 
 /* audio -> lock must be held at this point */
-static int audwma_aio_buf_add(struct q6audio *audio, unsigned dir,
+static int audaac_aio_buf_add(struct q6audio *audio, unsigned dir,
 			      void __user *arg)
 {
 	unsigned long flags;
-	struct audwma_buffer_node *buf_node;
+	struct audaac_buffer_node *buf_node;
 
 	buf_node = kzalloc(sizeof(*buf_node), GFP_KERNEL);
 
@@ -921,7 +932,7 @@ static int audwma_aio_buf_add(struct q6audio *audio, unsigned dir,
 			%d\n", buf_node, dir, buf_node->buf.buf_addr,
 			buf_node->buf.buf_len, buf_node->buf.data_len);
 
-	buf_node->paddr = audwma_pmem_fixup(audio, buf_node->buf.buf_addr,
+	buf_node->paddr = audaac_pmem_fixup(audio, buf_node->buf.buf_addr,
 					    buf_node->buf.buf_len, 1,
 					    &buf_node->kvaddr);
 	if (dir) {
@@ -934,32 +945,35 @@ static int audwma_aio_buf_add(struct q6audio *audio, unsigned dir,
 		}
 		extract_meta_info(audio, buf_node, 1);
 		/* Not a EOS buffer */
-		if (!(buf_node->meta_info.meta_in.nflags & AUDWMA_EOS_SET)) {
+		if (!(buf_node->meta_info.meta_in.nflags & AUDAAC_EOS_SET)) {
 			spin_lock_irqsave(&audio->dsp_lock, flags);
-			audwma_async_write(audio, buf_node);
+			audaac_async_write(audio, buf_node);
 			/* EOS buffer handled in driver */
 			list_add_tail(&buf_node->list, &audio->out_queue);
 			spin_unlock_irqrestore(&audio->dsp_lock, flags);
 		}
-		if (buf_node->meta_info.meta_in.nflags & AUDWMA_EOS_SET) {
+		if (buf_node->meta_info.meta_in.nflags & AUDAAC_EOS_SET) {
 			if (!audio->wflush) {
 			pr_debug("%s:Send EOS cmd at i/p\n", __func__);
 			/* Driver will forcefully post writedone event
-				once eos ack recived from DSP*/
-				audio->eos_write_payload.aio_buf =\
-						buf_node->buf;
+				 *	once eos ack recived from DSP
+				 */
+				audio->eos_write_payload.aio_buf =
+								buf_node->buf;
 				audio->eos_flag = 1;
 				audio->eos_rsp = 0;
 			q6asm_cmd(audio->ac, CMD_EOS);
 			kfree(buf_node);
-			} else { /* Flush in progress, send back i/p EOS buffer
-				    as is */
+			} else {/* Flush in progress, send back i/p
+				 * EOS buffer as is
+				 */
 				union msm_audio_event_payload event_payload;
 				event_payload.aio_buf = buf_node->buf;
-				audwma_post_event(audio, AUDIO_EVENT_WRITE_DONE,
+				audaac_post_event(audio, AUDIO_EVENT_WRITE_DONE,
 						event_payload);
 				kfree(buf_node);
 			}
+
 		}
 	} else {
 		/* read */
@@ -972,21 +986,21 @@ static int audwma_aio_buf_add(struct q6audio *audio, unsigned dir,
 		/* No EOS reached */
 		if (!audio->eos_rsp) {
 			spin_lock_irqsave(&audio->dsp_lock, flags);
-			audwma_async_read(audio, buf_node);
+			audaac_async_read(audio, buf_node);
 			/* EOS buffer handled in driver */
 			list_add_tail(&buf_node->list, &audio->in_queue);
 			spin_unlock_irqrestore(&audio->dsp_lock, flags);
-		}
+		} else {
 		/* EOS reached at input side fake all upcoming read buffer to
-		   indicate the same */
-		else {
+		 * indicate the same
+		 */
 			union msm_audio_event_payload event_payload;
 			event_payload.aio_buf = buf_node->buf;
 			event_payload.aio_buf.data_len =
 				insert_eos_buf(audio, buf_node);
-			pr_debug("%s: propagate READ_DONE as EOS done\n",\
-					__func__);
-			audwma_post_event(audio, AUDIO_EVENT_READ_DONE,
+			pr_debug("%s: propagate READ_DONE as EOS done\n",
+				__func__);
+			audaac_post_event(audio, AUDIO_EVENT_READ_DONE,
 					event_payload);
 			kfree(buf_node);
 		}
@@ -995,7 +1009,7 @@ static int audwma_aio_buf_add(struct q6audio *audio, unsigned dir,
 }
 
 /* TBD: Only useful in tunnel-mode */
-int audwma_async_fsync(struct q6audio *audio)
+int audaac_async_fsync(struct q6audio *audio)
 {
 	int rc = 0;
 
@@ -1004,7 +1018,7 @@ int audwma_async_fsync(struct q6audio *audio)
 	audio->drv_status |= ADRV_STATUS_FSYNC;
 	mutex_unlock(&audio->lock);
 
-	pr_aud_info("%s:\n", __func__);
+	pr_debug("%s:\n", __func__);
 
 	mutex_lock(&audio->write_lock);
 	audio->eos_rsp = 0;
@@ -1035,7 +1049,7 @@ int audwma_async_fsync(struct q6audio *audio)
 	}
 
 	if (audio->eos_rsp == 1) {
-		rc = audwma_enable(audio);
+		rc = audaac_enable(audio);
 		if (rc)
 			pr_aud_err("%s: audio enable failed\n", __func__);
 		else {
@@ -1056,7 +1070,7 @@ done:
 	return rc;
 }
 
-int audwma_fsync(struct file *file, int datasync)
+int audaac_fsync(struct file *file, int datasync)
 {
 	struct q6audio *audio = file->private_data;
 
@@ -1066,13 +1080,13 @@ int audwma_fsync(struct file *file, int datasync)
 	return audio->drv_ops.fsync(audio);
 }
 
-static void audwma_reset_pmem_region(struct q6audio *audio)
+static void audaac_reset_pmem_region(struct q6audio *audio)
 {
-	struct audwma_pmem_region *region;
+	struct audaac_pmem_region *region;
 	struct list_head *ptr, *next;
 
 	list_for_each_safe(ptr, next, &audio->pmem_region_queue) {
-		region = list_entry(ptr, struct audwma_pmem_region, list);
+		region = list_entry(ptr, struct audaac_pmem_region, list);
 		list_del(&region->list);
 		put_pmem_file(region->file);
 		kfree(region);
@@ -1082,13 +1096,13 @@ static void audwma_reset_pmem_region(struct q6audio *audio)
 }
 
 #ifdef CONFIG_DEBUG_FS
-static ssize_t audwma_debug_open(struct inode *inode, struct file *file)
+static ssize_t audaac_debug_open(struct inode *inode, struct file *file)
 {
 	file->private_data = inode->i_private;
 	return 0;
 }
 
-static ssize_t audwma_debug_read(struct file *file, char __user * buf,
+static ssize_t audaac_debug_read(struct file *file, char __user * buf,
 				 size_t count, loff_t *ppos)
 {
 	const int debug_bufmax = 4096;
@@ -1121,9 +1135,9 @@ static ssize_t audwma_debug_read(struct file *file, char __user * buf,
 	return simple_read_from_buffer(buf, count, ppos, buffer, n);
 }
 
-static const struct file_operations audwma_debug_fops = {
-	.read = audwma_debug_read,
-	.open = audwma_debug_open,
+static const struct file_operations audaac_debug_fops = {
+	.read = audaac_debug_read,
+	.open = audaac_debug_open,
 };
 #endif
 
@@ -1144,7 +1158,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	if (cmd == AUDIO_GET_EVENT) {
 		pr_debug("AUDIO_GET_EVENT\n");
 		if (mutex_trylock(&audio->get_event_lock)) {
-			rc = audwma_process_event_req(audio,
+			rc = audaac_process_event_req(audio,
 						      (void __user *)arg);
 			mutex_unlock(&audio->get_event_lock);
 		} else
@@ -1158,7 +1172,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EBUSY;
 		else {
 			if (audio->enabled)
-				rc = audwma_aio_buf_add(audio, 1,
+				rc = audaac_aio_buf_add(audio, 1,
 						(void __user *)arg);
 			else
 				rc = -EPERM;
@@ -1170,7 +1184,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	if (cmd == AUDIO_ASYNC_READ) {
 		mutex_lock(&audio->read_lock);
 		if ((audio->feedback) && (audio->enabled))
-			rc = audwma_aio_buf_add(audio, 0,
+			rc = audaac_aio_buf_add(audio, 0,
 					(void __user *)arg);
 		else
 			rc = -EPERM;
@@ -1187,7 +1201,8 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	mutex_lock(&audio->lock);
 	switch (cmd) {
 	case AUDIO_START: {
-		struct asm_wma_cfg wma_cfg;
+		struct asm_aac_cfg aac_cfg;
+		uint32_t sbr_ps = 0x00;
 		if (audio->feedback == NON_TUNNEL_MODE) {
 			/* Configure PCM output block */
 			rc = q6asm_enc_cfg_blk_pcm(audio->ac,
@@ -1198,22 +1213,51 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				break;
 			}
 		}
-		wma_cfg.format_tag = audio->wma_config.format_tag;
-		wma_cfg.ch_cfg = audio->wma_config.numchannels;
-		wma_cfg.sample_rate =  audio->wma_config.samplingrate;
-		wma_cfg.avg_bytes_per_sec = audio->wma_config.avgbytespersecond;
-		wma_cfg.block_align = audio->wma_config.block_align;
-		wma_cfg.valid_bits_per_sample =
-				audio->wma_config.validbitspersample;
-		wma_cfg.ch_mask =  audio->wma_config.channelmask;
-		wma_cfg.encode_opt = audio->wma_config.encodeopt;
+		/* turn on both sbr and ps */
+		rc = q6asm_enable_sbrps(audio->ac, sbr_ps);
+		if (rc < 0)
+			pr_aud_err("sbr-ps enable failed\n");
+		if (audio->aac_config.sbr_on_flag)
+			aac_cfg.aot = AAC_ENC_MODE_AAC_P;
+		else if (audio->aac_config.sbr_ps_on_flag)
+			aac_cfg.aot = AAC_ENC_MODE_EAAC_P;
+		else
+			aac_cfg.aot = AAC_ENC_MODE_AAC_LC;
+
+		switch (audio->aac_config.format) {
+		case AUDIO_AAC_FORMAT_ADTS:
+			aac_cfg.format = 0x00;
+			break;
+		case AUDIO_AAC_FORMAT_LOAS:
+			aac_cfg.format = 0x01;
+			break;
+		/* ADIF, use it as RAW */
+		default:
+		case AUDIO_AAC_FORMAT_RAW:
+			aac_cfg.format = 0x03;
+		}
+		aac_cfg.ep_config = audio->aac_config.ep_config;
+		aac_cfg.section_data_resilience =
+			audio->aac_config.aac_section_data_resilience_flag;
+		aac_cfg.scalefactor_data_resilience =
+			audio->aac_config.aac_scalefactor_data_resilience_flag;
+		aac_cfg.spectral_data_resilience =
+			audio->aac_config.aac_spectral_data_resilience_flag;
+		aac_cfg.ch_cfg = audio->pcm_cfg.channel_count;
+		aac_cfg.sample_rate =  audio->pcm_cfg.sample_rate;
+
+		pr_debug("%s:format=%x aot=%d  ch=%d sr=%d\n",
+			__func__, aac_cfg.format,
+			aac_cfg.aot, aac_cfg.ch_cfg,
+			aac_cfg.sample_rate);
+
 		/* Configure Media format block */
-		rc = q6asm_media_format_block_wma(audio->ac, &wma_cfg);
+		rc = q6asm_media_format_block_aac(audio->ac, &aac_cfg);
 		if (rc < 0) {
 			pr_aud_err("cmd media format block failed\n");
 			break;
 		}
-		rc = audwma_enable(audio);
+		rc = audaac_enable(audio);
 		audio->eos_rsp = 0;
 		audio->eos_flag = 0;
 		if (!rc) {
@@ -1223,15 +1267,18 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			pr_aud_err("Audio Start procedure failed rc=%d\n", rc);
 			break;
 		}
-		pr_debug("AUDIO_START success enable[%d]\n", audio->enabled);
+		pr_aud_info("%s: AUDIO_START sessionid[%d]enable[%d]\n", __func__,
+						audio->ac->session,
+						audio->enabled);
 		if (audio->stopped == 1)
 			audio->stopped = 0;
 		break;
 	}
 	case AUDIO_STOP: {
-		pr_debug("AUDIO_STOP\n");
+		pr_debug("%s: AUDIO_STOP sessionid[%d]\n", __func__,
+						audio->ac->session);
 		audio->stopped = 1;
-		audwma_flush(audio);
+		audaac_flush(audio);
 		audio->enabled = 0;
 		audio->drv_status &= ~ADRV_STATUS_PAUSE;
 		if (rc < 0) {
@@ -1243,14 +1290,14 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case AUDIO_PAUSE: {
 		pr_debug("AUDIO_PAUSE %ld\n", arg);
 		if (arg == 1) {
-			rc = audwma_pause(audio);
+			rc = audaac_pause(audio);
 			if (rc < 0)
 				pr_aud_err("%s: pause FAILED rc=%d\n", __func__,
 						rc);
 				audio->drv_status |= ADRV_STATUS_PAUSE;
 		} else if (arg == 0) {
 			if (audio->drv_status & ADRV_STATUS_PAUSE) {
-				rc = audwma_enable(audio);
+				rc = audaac_enable(audio);
 				if (rc)
 					pr_aud_err("%s: audio enable failed\n",
 						__func__);
@@ -1263,13 +1310,14 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 	case AUDIO_FLUSH: {
-		pr_debug("AUDIO_FLUSH\n");
+		pr_debug("%s: AUDIO_FLUSH sessionid[%d]\n", __func__,
+						audio->ac->session);
 		audio->rflush = 1;
 		audio->wflush = 1;
 		/* Flush DSP */
-		rc = audwma_flush(audio);
+		rc = audaac_flush(audio);
 		/* Flush input / Output buffer in software*/
-		audwma_ioport_reset(audio);
+		audaac_ioport_reset(audio);
 		if (rc < 0) {
 			pr_aud_err("AUDIO_FLUSH interrupted\n");
 			rc = -EINTR;
@@ -1287,7 +1335,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
 		else
-			rc = audwma_pmem_add(audio, &info);
+			rc = audaac_pmem_add(audio, &info);
 		break;
 	}
 	case AUDIO_DEREGISTER_PMEM: {
@@ -1296,20 +1344,20 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
 		else
-			rc = audwma_pmem_remove(audio, &info);
+			rc = audaac_pmem_remove(audio, &info);
 		break;
 	}
-	case AUDIO_GET_WMA_CONFIG_V2: {
-		if (copy_to_user((void *)arg, &audio->wma_config,
-				 sizeof(struct msm_audio_wma_config_v2))) {
+	case AUDIO_GET_AAC_CONFIG: {
+		if (copy_to_user((void *)arg, &audio->aac_config,
+				 sizeof(struct msm_audio_aac_config))) {
 			rc = -EFAULT;
 			break;
 		}
 		break;
 	}
-	case AUDIO_SET_WMA_CONFIG_V2: {
-		if (copy_from_user(&audio->wma_config, (void *)arg,
-				 sizeof(struct msm_audio_wma_config_v2))) {
+	case AUDIO_SET_AAC_CONFIG: {
+		if (copy_from_user(&audio->aac_config, (void *)arg,
+				 sizeof(struct msm_audio_aac_config))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -1415,14 +1463,15 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static int audio_release(struct inode *inode, struct file *file)
 {
 	struct q6audio *audio = file->private_data;
+	pr_debug("%s: aac dec\n", __func__);
 	mutex_lock(&audio->lock);
-	audwma_disable(audio);
+	audaac_disable(audio);
 	audio->drv_ops.out_flush(audio);
 	audio->drv_ops.in_flush(audio);
-	audwma_reset_pmem_region(audio);
+	audaac_reset_pmem_region(audio);
 	audio->event_abort = 1;
 	wake_up(&audio->event_wait);
-	audwma_reset_event_queue(audio);
+	audaac_reset_event_queue(audio);
 	q6asm_audio_client_free(audio->ac);
 	mutex_unlock(&audio->lock);
 	mutex_destroy(&audio->lock);
@@ -1434,7 +1483,7 @@ static int audio_release(struct inode *inode, struct file *file)
 		debugfs_remove(audio->dentry);
 #endif
 	kfree(audio);
-	pr_aud_info("%s: wma_decoder success\n", __func__);
+	pr_aud_info("%s:aac dec success\n", __func__);
 	return 0;
 }
 
@@ -1443,16 +1492,16 @@ static int audio_open(struct inode *inode, struct file *file)
 	struct q6audio *audio = NULL;
 	int rc = 0;
 	int i;
-	struct audwma_event *e_node = NULL;
+	struct audaac_event *e_node = NULL;
 
 #ifdef CONFIG_DEBUG_FS
 	/* 4 bytes represents decoder number, 1 byte for terminate string */
-	char name[sizeof "msm_wma_" + 5];
+	char name[sizeof "msm_aac_" + 5];
 #endif
 	audio = kzalloc(sizeof(struct q6audio), GFP_KERNEL);
 
 	if (audio == NULL) {
-		pr_aud_err("Could not allocate memory for wma decode driver\n");
+		pr_aud_err("Could not allocate memory for aac decode driver\n");
 		return -ENOMEM;
 	}
 
@@ -1466,7 +1515,7 @@ static int audio_open(struct inode *inode, struct file *file)
 	audio->pcm_cfg.sample_rate = 48000;
 	audio->pcm_cfg.channel_count = 2;
 
-	audio->ac = q6asm_audio_client_alloc((app_cb) q6_audwma_cb,
+	audio->ac = q6asm_audio_client_alloc((app_cb) q6_audaac_cb,
 					     (void *)audio);
 
 	if (!audio->ac) {
@@ -1478,9 +1527,9 @@ static int audio_open(struct inode *inode, struct file *file)
 	if (file->f_flags & O_NONBLOCK) {
 		pr_debug("set to aio interface\n");
 		audio->drv_status |= ADRV_STATUS_AIO_INTF;
-		audio->drv_ops.out_flush = audwma_async_out_flush;
-		audio->drv_ops.in_flush = audwma_async_in_flush;
-		audio->drv_ops.fsync = audwma_async_fsync;
+		audio->drv_ops.out_flush = audaac_async_out_flush;
+		audio->drv_ops.in_flush = audaac_async_in_flush;
+		audio->drv_ops.fsync = audaac_async_fsync;
 		q6asm_set_io_mode(audio->ac, ASYNC_IO_MODE);
 	} else {
 		pr_aud_err("SIO interface not supported\n");
@@ -1491,19 +1540,19 @@ static int audio_open(struct inode *inode, struct file *file)
 	/* open in T/NT mode */
 	if ((file->f_mode & FMODE_WRITE) && (file->f_mode & FMODE_READ)) {
 		rc = q6asm_open_read_write(audio->ac, FORMAT_LINEAR_PCM,
-					   FORMAT_WMA_V9);
+					   FORMAT_MPEG4_AAC);
 		if (rc < 0) {
 			pr_aud_err("NT mode Open failed rc=%d\n", rc);
 			rc = -ENODEV;
 			goto fail;
 		}
 		audio->feedback = NON_TUNNEL_MODE;
-		/* open WMA decoder, expected frames is always 1*/
-		audio->buf_cfg.frames_per_buf = 0x01;
+		/* open AAC decoder, expected frames is always 1
+		audio->buf_cfg.frames_per_buf = 0x01;*/
 		audio->buf_cfg.meta_info_enable = 0x01;
 	} else if ((file->f_mode & FMODE_WRITE) &&
 			!(file->f_mode & FMODE_READ)) {
-		rc = q6asm_open_write(audio->ac, FORMAT_WMA_V9);
+		rc = q6asm_open_write(audio->ac, FORMAT_MPEG4_AAC);
 		if (rc < 0) {
 			pr_aud_err("T mode Open failed rc=%d\n", rc);
 			rc = -ENODEV;
@@ -1537,16 +1586,16 @@ static int audio_open(struct inode *inode, struct file *file)
 	file->private_data = audio;
 
 #ifdef CONFIG_DEBUG_FS
-	snprintf(name, sizeof name, "msm_wma_%04x", audio->ac->session);
+	snprintf(name, sizeof name, "msm_aac_%04x", audio->ac->session);
 	audio->dentry = debugfs_create_file(name, S_IFREG | S_IRUGO,
 					    NULL, (void *)audio,
-					    &audwma_debug_fops);
+					    &audaac_debug_fops);
 
 	if (IS_ERR(audio->dentry))
 		pr_debug("debugfs_create_file failed\n");
 #endif
-	for (i = 0; i < AUDWMA_EVENT_NUM; i++) {
-		e_node = kmalloc(sizeof(struct audwma_event), GFP_KERNEL);
+	for (i = 0; i < AUDAAC_EVENT_NUM; i++) {
+		e_node = kmalloc(sizeof(struct audaac_event), GFP_KERNEL);
 		if (e_node)
 			list_add_tail(&e_node->list, &audio->free_event_queue);
 		else {
@@ -1554,8 +1603,9 @@ static int audio_open(struct inode *inode, struct file *file)
 			break;
 		}
 	}
-	pr_aud_info("%s:wma decoder open success, session_id = %d\n", __func__,
-				audio->ac->session);
+	pr_aud_info("%s:aacdec success mode[%d]session[%d]\n", __func__,
+						audio->feedback,
+						audio->ac->session);
 	return 0;
 fail:
 	q6asm_audio_client_free(audio->ac);
@@ -1563,23 +1613,23 @@ fail:
 	return rc;
 }
 
-static const struct file_operations audio_wma_fops = {
+static const struct file_operations audio_aac_fops = {
 	.owner = THIS_MODULE,
 	.open = audio_open,
 	.release = audio_release,
 	.unlocked_ioctl = audio_ioctl,
-	.fsync = audwma_fsync,
+	.fsync = audaac_fsync,
 };
 
-struct miscdevice audwma_misc = {
+struct miscdevice audaac_misc = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "msm_wma",
-	.fops = &audio_wma_fops,
+	.name = "msm_aac",
+	.fops = &audio_aac_fops,
 };
 
-static int __init audio_wma_init(void)
+static int __init audio_aac_init(void)
 {
-	return misc_register(&audwma_misc);
+	return misc_register(&audaac_misc);
 }
 
-device_initcall(audio_wma_init);
+device_initcall(audio_aac_init);

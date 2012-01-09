@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -84,8 +84,10 @@ int apr_tal_write(struct apr_svc_ch_dev *apr_ch, void *data, int len)
 		rc = __apr_tal_write(apr_ch, data, len);
 	} while (rc == -EAGAIN && retries++ < 300);
 
-	if (rc == -EAGAIN)
+	if (rc == -EAGAIN) {
 		pr_aud_err("apr_tal: TIMEOUT for write\n");
+		BUG();
+	}
 
 	return rc;
 }
@@ -167,8 +169,14 @@ struct apr_svc_ch_dev *apr_tal_open(uint32_t svc, uint32_t dest,
 
 	mutex_lock(&apr_svc_ch[dl][dest][svc].m_lock);
 	if (!apr_svc_ch[dl][dest][svc].dest_state) {
-		wait_event(apr_svc_ch[dl][dest][svc].dest,
-			apr_svc_ch[dl][dest][svc].dest_state);
+		rc = wait_event_timeout(apr_svc_ch[dl][dest][svc].dest,
+			apr_svc_ch[dl][dest][svc].dest_state,
+				msecs_to_jiffies(APR_OPEN_TIMEOUT_MS));
+		if (rc == 0) {
+			pr_aud_err("%s: TIMEOUT for dest %d svc %d\n", __func__, dest, svc);
+			mutex_unlock(&apr_svc_ch[dl][dest][svc].m_lock);
+			BUG();
+		}
 		pr_debug("apr_tal:Wakeup done\n");
 		apr_svc_ch[dl][dest][svc].dest_state = 0;
 	}
@@ -187,6 +195,7 @@ struct apr_svc_ch_dev *apr_tal_open(uint32_t svc, uint32_t dest,
 	if (rc == 0) {
 		pr_aud_err("apr_tal:TIMEOUT for OPEN event\n");
 		mutex_unlock(&apr_svc_ch[dl][dest][svc].m_lock);
+		BUG();
 		return NULL;
 	}
 	if (!apr_svc_ch[dl][dest][svc].dest_state) {

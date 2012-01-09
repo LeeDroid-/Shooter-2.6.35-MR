@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,44 +24,55 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  */
-#ifndef __Q6AFE_H__
-#define __Q6AFE_H__
-#include <mach/qdsp6v2/apr_audio.h>
 
-#define MSM_AFE_MONO		0
-#define MSM_AFE_MONO_RIGHT	1
-#define MSM_AFE_MONO_LEFT	2
-#define MSM_AFE_STEREO		3
+#ifndef __SUBSYS_RESTART_H
+#define __SUBSYS_RESTART_H
 
-enum {
-	IDX_PRIMARY_I2S_RX = 0,
-	IDX_PRIMARY_I2S_TX = 1,
-	IDX_PCM_RX = 2,
-	IDX_PCM_TX = 3,
-	IDX_SECONDARY_I2S_RX = 4,
-	IDX_SECONDARY_I2S_TX = 5,
-	IDX_MI2S_RX = 6,
-	IDX_MI2S_TX = 7,
-	IDX_HDMI_RX = 8,
-	IDX_RSVD_2 = 9,
-	IDX_RSVD_3 = 10,
-	IDX_DIGI_MIC_TX = 11,
-	IDX_VOICE_RECORD_RX = 12,
-	IDX_VOICE_RECORD_TX = 13,
-	IDX_VOICE_PLAYBACK_TX = 14,
-	AFE_MAX_PORTS
+#include <linux/spinlock.h>
+
+#define SUBSYS_NAME_MAX_LENGTH 40
+
+#define RESET_SOC 0x1
+#define RESET_SUBSYS_COUPLED 0x2
+#define RESET_SUBSYS_INDEPENDENT 0x3
+
+struct subsys_data {
+	const char *name;
+	int (*shutdown) (void);
+	int (*powerup) (void);
+	void (*crash_shutdown) (struct subsys_data *);
+	int (*ramdump) (int);
+
+	/* Internal use only */
+	struct list_head list;
+	void *notif_handle;
+
+	struct mutex shutdown_lock;
+	struct mutex powerup_lock;
+
+	void *restart_order;
+	struct subsys_data *single_restart_list[1];
 };
 
-int afe_open(u16 port_id, union afe_port_config *afe_config, int rate);
-int afe_close(int port_id);
-int afe_loopback(u16 enable, u16 rx_port, u16 tx_port);
-int afe_sidetone(u16 tx_port_id, u16 rx_port_id, u16 enable, uint16_t gain);
-int afe_loopback_gain(u16 port_id, u16 volume);
-int afe_validate_port(u16 port_id);
-int afe_get_port_index(u16 port_id);
-int afe_start_pseudo_port(u16 port_id);
-int afe_stop_pseudo_port(u16 port_id);
-int afe_apply_gain(u16 port_id, u16 gain); // Qualcomm CR
+#if defined(CONFIG_MSM_SUBSYSTEM_RESTART)
 
-#endif /* __Q6AFE_H__ */
+int subsystem_restart(const char *subsys_name);
+int ssr_register_subsystem(struct subsys_data *subsys);
+
+#else
+
+static inline int subsystem_restart(const char *subsystem_name)
+{
+	return 0;
+}
+
+static inline int ssr_register_subsystem(struct subsys_data *subsys)
+{
+	return 0;
+}
+
+#endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
+
+#endif
