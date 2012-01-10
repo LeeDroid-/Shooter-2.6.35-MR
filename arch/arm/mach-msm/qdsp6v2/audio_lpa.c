@@ -45,8 +45,8 @@
 #include <mach/debug_mm.h>
 #include <linux/fs.h>
 
-#define MAX_BUF 3
-#define BUFSZ (524288)
+#define MAX_BUF 4
+#define BUFSZ (655360)
 
 #define AUDDEC_DEC_PCM 0
 
