@@ -704,7 +704,7 @@ static void msmfb_onchg_suspend(struct early_suspend *h)
 {
 	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
 						    onchg_suspend);
-#ifdef CONFIG_FB_MSM_OVERLAY
+#ifdef CONFIG_FB_MSM_MDP303
 	/*
 	* For MDP with overlay, set framebuffer with black pixels
 	* to show black screen on HDMI.
