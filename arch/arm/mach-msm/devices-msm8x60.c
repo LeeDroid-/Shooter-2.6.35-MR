@@ -743,7 +743,7 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 	.pwr_data = {
 		.pwrlevel = {
 			{
-				.gpu_freq = 266667000,
+				.gpu_freq = 320000000,
 				.bus_freq = 2,
 			},
 			{
@@ -908,7 +908,7 @@ struct kgsl_platform_data kgsl_pdata = {
 	.max_grp2d_freq = 228571000,
 	.min_grp2d_freq = 228571000,
 	.set_grp2d_async = NULL, /* HW workaround, run Z180 SYNC @ 192 MHZ */
-	.max_grp3d_freq = 266667000,
+	.max_grp3d_freq = 320000000,
 	.min_grp3d_freq = 266667000,
 	.set_grp3d_async = NULL,
 	.imem_clk_name = "imem_axi_clk",
