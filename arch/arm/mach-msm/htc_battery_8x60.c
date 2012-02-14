@@ -144,8 +144,9 @@ static void tps_int_notifier_func(int int_reg, int value)
 static int batt_set_voltage_alarm(unsigned long lower_threshold,
 			unsigned long upper_threshold)
 #else
- static int batt_alarm_config(unsigned long lower_threshold,
- 			unsigned long upper_threshold)
+static int batt_alarm_config(unsigned long lower_threshold,
+			unsigned long upper_threshold)
+#endif
 {
 	int rc = 0;
 
@@ -154,6 +155,12 @@ static int batt_set_voltage_alarm(unsigned long lower_threshold,
 	rc = pm8058_batt_alarm_state_set(0, 0);
 	if (rc) {
 		BATT_ERR("state_set disabled failed, rc=%d", rc);
+		goto done;
+	}
+
+	rc = pm8058_batt_alarm_threshold_set(lower_threshold, upper_threshold);
+	if (rc) {
+		BATT_ERR("threshold_set failed, rc=%d!", rc);
 		goto done;
 	}
 
@@ -225,6 +232,7 @@ static struct notifier_block battery_alarm_notifier = {
 static int battery_alarm_notifier_func(struct notifier_block *nfb,
 					unsigned long status, void *data)
 {
+
 #ifdef CONFIG_HTC_BATT_ALARM
 	BATT_LOG("%s \n", __func__);
 
@@ -345,24 +353,19 @@ static int htc_batt_charger_control(enum charger_control_flag control)
 {
 	char message[16] = "CHARGERSWITCH=";
 	char *envp[] = { message, NULL };
-	int ret = 0;
 
 	BATT_LOG("%s: switch charger to mode: %u", __func__, control);
 
-	if (control == STOP_CHARGER) {
+	if (control == STOP_CHARGER)
 		strncat(message, "0", 1);
-		kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
-	} else if (control == ENABLE_CHARGER) {
+	else if (control == ENABLE_CHARGER)
 		strncat(message, "1", 1);
-		kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
-	} else if (control == ENABLE_LIMIT_CHARGER)
-		ret = tps_set_charger_ctrl(ENABLE_LIMITED_CHG);
-	else if (control == DISABLE_LIMIT_CHARGER)
-		ret = tps_set_charger_ctrl(CLEAR_LIMITED_CHG);
 	else
 		return -1;
 
-	return ret;
+	kobject_uevent_env(&htc_batt_info.batt_cable_kobj, KOBJ_CHANGE, envp);
+
+	return 0;
 }
 
 static void htc_batt_set_full_level(int percent)
@@ -763,20 +766,6 @@ static struct kobj_type htc_batt_ktype = {
 	.release = htc_batt_kobject_release,
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void htc_battery_early_suspend(struct early_suspend *h)
-{
-	screen_state = 0;
-	batt_set_voltage_alarm_mode(BATT_ALARM_DISABLE_MODE);
-}
-
-static void htc_battery_late_resume(struct early_suspend *h)
-{
-	screen_state = 1;
-	batt_set_voltage_alarm_mode(BATT_ALARM_CRITICAL_MODE);
-}
-#endif
-
 #ifdef CONFIG_HTC_BATT_ALARM
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void htc_battery_early_suspend(struct early_suspend *h)
@@ -1007,13 +996,6 @@ static int htc_battery_probe(struct platform_device *pdev)
 		BATT_ERR("Get first battery ADC value failed!");
 		goto fail;
 	}
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 2;
-	early_suspend.suspend = htc_battery_early_suspend;
-	early_suspend.resume = htc_battery_late_resume;
-	register_early_suspend(&early_suspend);
-#endif
 
 #ifdef CONFIG_HTC_BATT_ALARM
 #ifdef CONFIG_HAS_EARLYSUSPEND
