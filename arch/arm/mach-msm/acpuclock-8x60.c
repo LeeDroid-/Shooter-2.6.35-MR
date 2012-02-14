@@ -729,7 +729,6 @@ void acpuclk_set_vdd(unsigned int khz, int vdd_uv) {
 		else if ( acpu_freq_tbl[i].acpuclk_khz == khz)
 			new_vdd_uv = min(max((unsigned int)vdd_uv, (unsigned int)MIN_VDD_SC), (unsigned int)MAX_VDD_SC);
 		else 
-		else
 			continue;
 
 		acpu_freq_tbl[i].vdd_sc = new_vdd_uv;
