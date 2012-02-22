@@ -300,10 +300,7 @@ void button_pressed(int type)
 
 void button_released(int type)
 {
-	char key_name[16];
-
-	get_key_name(type, key_name);
-	HS_LOG_TIME("%s (%d) released", key_name, type);
+	HS_LOG_TIME("button_released %d", type);
 	atomic_set(&hi->btn_state, 0);
 	input_report_key(hi->input, type, 0);
 	input_sync(hi->input);
@@ -320,7 +317,7 @@ void headset_button_event(int is_press, int type)
 	}
 
 	if (!hs_hpin_stable()) {
-		HS_LOG("IGNORE key %d (Unstable HPIN)", type);
+		HS_LOG("The HPIN is unstable, SKIP THE BUTTON EVENT.");
 		return;
 	}
 
@@ -600,12 +597,15 @@ static void button_35mm_work_func(struct work_struct *work)
 	if (hi->key_level_flag) {
 		switch (hi->key_level_flag) {
 		case 1:
+			HS_LOG("3.5mm RC: Play Pressed");
 			key = HS_MGR_KEYCODE_MEDIA;
 			break;
 		case 2:
+			HS_LOG("3.5mm RC: BACKWARD Pressed");
 			key = HS_MGR_KEYCODE_BACKWARD;
 			break;
 		case 3:
+			HS_LOG("3.5mm RC: FORWARD Pressed");
 			key = HS_MGR_KEYCODE_FORWARD;
 			break;
 		default:
@@ -835,7 +835,7 @@ int hs_notify_key_event(int key_code)
 	    hi->h2w_35mm_type == HEADSET_NO_MIC)
 		update_mic_status(HS_DEF_MIC_DETECT_COUNT);
 	else if (!hs_hpin_stable()) {
-		HS_LOG("IGNORE key %d (Unstable HPIN)", key_code);
+		HS_LOG("The HPIN is unstable, SKIP THE BUTTON EVENT.");
 		return 1;
 	} else {
 		work = kzalloc(sizeof(struct button_work), GFP_KERNEL);
