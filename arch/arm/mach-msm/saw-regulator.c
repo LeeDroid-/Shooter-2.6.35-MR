@@ -65,7 +65,7 @@
  * called.
  */
 #define BOOT_LOADER_CORE_VOLTAGE	1200000
-#define MIN_CORE_VOLTAGE		950000
+#define MIN_CORE_VOLTAGE		800000
 
 /* Specifies the PMIC internal slew rate in uV/us. */
 #define REGULATOR_SLEW_RATE		1250
