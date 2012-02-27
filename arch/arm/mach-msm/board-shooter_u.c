@@ -5440,6 +5440,9 @@ static void __init shooter_u_init(void)
 	spi_register_board_info(sp3d_spi_board_info,
 			ARRAY_SIZE(sp3d_spi_board_info));
 
+#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
+int set_two_phase_freq(int cpufreq);
+#endif
 
 	/* Buses need to be initialized before early-device registration
 	 * to get the platform data for fabrics.
@@ -5448,6 +5451,10 @@ static void __init shooter_u_init(void)
 
 #ifdef CONFIG_BT
 	bt_export_bd_address();
+#endif
+
+#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
+	set_two_phase_freq(1188000);
 #endif
 
 	platform_add_devices(early_devices, ARRAY_SIZE(early_devices));
