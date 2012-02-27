@@ -37,12 +37,19 @@
 #include <linux/slab.h>
 #include <mach/board.h>
 
-#define DPS(x...) printk(KERN_DEBUG "[PS][ISL29028] " x)
-#define DLS(x...) printk(KERN_DEBUG "[LS][ISL29028] " x)
-#define IPS(x...) printk(KERN_INFO "[PS][ISL29028] " x)
-#define ILS(x...) printk(KERN_INFO "[LS][ISL29028] " x)
-#define EPS(x...) printk(KERN_ERR "[PS][ISL29028 ERROR] " x)
-#define ELS(x...) printk(KERN_ERR "[LS][ISL29028 ERROR] " x)
+//#define DPS(x...) printk(KERN_DEBUG "[PS][ISL29028] " x)
+//#define DLS(x...) printk(KERN_DEBUG "[LS][ISL29028] " x)
+//#define IPS(x...) printk(KERN_INFO "[PS][ISL29028] " x)
+//#define ILS(x...) printk(KERN_INFO "[LS][ISL29028] " x)
+//#define EPS(x...) printk(KERN_ERR "[PS][ISL29028 ERROR] " x)
+//#define ELS(x...) printk(KERN_ERR "[LS][ISL29028 ERROR] " x)
+
+#define DPS(x...)
+#define DLS(x...)
+#define IPS(x...)
+#define ILS(x...)
+#define EPS(x...)
+#define ELS(x...)
 
 #define I2C_RETRY_COUNT 10
 
