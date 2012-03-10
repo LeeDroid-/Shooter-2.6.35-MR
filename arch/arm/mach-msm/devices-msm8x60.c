@@ -673,7 +673,8 @@ static struct msm_bus_vectors grp2d0_max_vectors[] = {
 		.ib = 2096000000U,	// HTC:
 #else
 		.ab = 0,
-		.ib = 2096000000U,
+		//.ib = 2096000000U,		//HTC
+		.ib = 990000000U,
 #endif
 	},
 };
@@ -714,7 +715,8 @@ static struct msm_bus_vectors grp2d1_max_vectors[] = {
 		.ib = 2096000000U,		// HTC
 #else
 		.ab = 0,
-		.ib = 2096000000U,
+		//.ib = 2096000000U,		//HTC
+		.ib = 990000000U,
 #endif
 	},
 };
