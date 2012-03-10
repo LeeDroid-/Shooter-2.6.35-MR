@@ -35,12 +35,12 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_UP_THRESHOLD			CONFIG_LAGFREE_MAX_LOAD
-#define DEF_FREQUENCY_DOWN_THRESHOLD		CONFIG_LAGFREE_MIN_LOAD
-#define FREQ_STEP_DOWN 						CONFIG_LAGFREE_FREQ_STEP_DOWN
-#define FREQ_SLEEP_MAX 						CONFIG_LAGFREE_FREQ_SLEEP_MAX
-#define FREQ_AWAKE_MIN 						CONFIG_LAGFREE_FREQ_AWAKE_MIN
-#define FREQ_STEP_UP_SLEEP_PERCENT 			CONFIG_LAGFREE_FREQ_STEP_UP_SLEEP_PERCENT
+#define DEF_FREQUENCY_UP_THRESHOLD			(80)
+#define DEF_FREQUENCY_DOWN_THRESHOLD		(45)
+#define FREQ_STEP_DOWN 						(160000)
+#define FREQ_SLEEP_MAX 						(245760)
+#define FREQ_AWAKE_MIN 						(245760)
+#define FREQ_STEP_UP_SLEEP_PERCENT 			(20)
 
 /*
  * The polling frequency of this governor depends on the capability of
@@ -660,3 +660,4 @@ fs_initcall(cpufreq_gov_dbs_init);
 module_init(cpufreq_gov_dbs_init);
 #endif
 module_exit(cpufreq_gov_dbs_exit); 
+
