@@ -1408,6 +1408,10 @@ config NUTTER_MODE
 	help
 	  Enabling this option will allow OC up to 1998MHz.
 
+config FB_MSM_TRIPLE_BUFFER
+	bool "Enable tripple buffering"
+	default n
+
 if CPU_FREQ_MSM
 
 config MSM_CPU_FREQ_SET_MIN_MAX
