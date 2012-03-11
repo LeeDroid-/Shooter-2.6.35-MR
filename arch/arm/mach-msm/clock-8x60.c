@@ -1126,6 +1126,7 @@ static struct clk_freq_tbl clk_tbl_gfx2d[] = {
 	F_GFX2D(177778000, MM_PLL1,  2,  9, NOMINAL),
 	F_GFX2D(200000000, MM_PLL1,  1,  4, NOMINAL),
 	F_GFX2D(228571000, MM_PLL1,  2,  7, HIGH),
+	F_GFX2D(266667000, MM_PLL1,  1,  3, HIGH),
 	F_END,
 };
 

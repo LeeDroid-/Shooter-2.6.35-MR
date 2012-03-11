@@ -601,7 +601,7 @@ static struct msm_bus_vectors grp3d_init_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = 0,
+		.ib = 2096000000U,
 	},
 };
 
@@ -626,7 +626,7 @@ static struct msm_bus_vectors grp3d_max_vectors[] = {
 		.ib = 2096000000U,		// HTC: Raise up bw due to avoid underrun
 #else
 		.ab = 0,
-		.ib = 2096000000U,
+		.ib = 2484000000U,
 #endif
 	},
 };
@@ -907,7 +907,7 @@ struct kgsl_platform_data kgsl_pdata = {
 	.high_axi_3d = 200000,
 	.high_axi_2d = 160000,
 #endif
-	.max_grp2d_freq = 228571000,
+	.max_grp2d_freq = 266667000,
 	.min_grp2d_freq = 228571000,
 	.set_grp2d_async = NULL, /* HW workaround, run Z180 SYNC @ 192 MHZ */
 	.max_grp3d_freq = 320000000,
