@@ -130,7 +130,7 @@ static void pm8058_pwm_led_brightness_set(struct led_classdev *led_cdev,
 	brightness = (brightness < LED_OFF) ? LED_OFF : brightness;
 	printk(KERN_INFO "%s: bank %d brightness %d +\n", __func__,
 	       ldata->bank, brightness);
-
+	
 	if (brightness) {
 		pwm_config(ldata->pwm_led, 64000, 64000);
 #if 0
@@ -167,13 +167,24 @@ static void pm8058_drvx_led_brightness_set(struct led_classdev *led_cdev,
 
 	brightness = (brightness > LED_FULL) ? LED_FULL : brightness;
 	brightness = (brightness < LED_OFF) ? LED_OFF : brightness;
+	
 	printk(KERN_INFO "%s: bank %d brightness %d +\n", __func__,
 	       ldata->bank, brightness);
-
+	
 	if (brightness) {
-		milliamps = (ldata->flags & PM8058_LED_DYNAMIC_BRIGHTNESS_EN) ?
-			    ldata->out_current * brightness / LED_FULL :
-			    ldata->out_current;
+	
+		//milliamps = (ldata->flags & PM8058_LED_DYNAMIC_BRIGHTNESS_EN) ?
+		//	    ldata->out_current * brightness / LED_FULL :
+		//	    ldata->out_current;
+		milliamps = ldata->out_current;
+		if(brightness < 20)
+		{
+			milliamps = brightness + 1;
+		}
+		
+		printk(KERN_INFO "%s: bank %d milliamps %d +\n", __func__,
+	       ldata->bank, milliamps);	       
+	       	       
 		pm8058_pwm_config_led(ldata->pwm_led, id, mode, milliamps);
 		if (ldata->flags & PM8058_LED_LTU_EN) {
 			pduties = &duties[ldata->start_index];
@@ -186,10 +197,10 @@ static void pm8058_drvx_led_brightness_set(struct led_classdev *led_cdev,
 					      0, 0,
 					      ldata->lut_flag);
 			pm8058_pwm_lut_enable(ldata->pwm_led, 0);
-			pm8058_pwm_lut_enable(ldata->pwm_led, 1);
+			pm8058_pwm_lut_enable(ldata->pwm_led, 1);	
 		} else {
 			pwm_config(ldata->pwm_led, 64000, 64000);
-			pwm_enable(ldata->pwm_led);
+			pwm_enable(ldata->pwm_led);			
 		}
 	} else {
 		if (ldata->flags & PM8058_LED_LTU_EN) {
@@ -343,8 +354,9 @@ static ssize_t pm8058_led_off_timer_store(struct device *dev,
 	min = -1;
 	sec = -1;
 	sscanf(buf, "%d %d", &min, &sec);
+	
 
-	if (min < 0 || min > 255)
+	if (min < 0 || min > 255 || min == 5)
 		return -EINVAL;
 	if (sec < 0 || sec > 255)
 		return -EINVAL;
